@@ -650,17 +650,17 @@ async function runPrompt($: EngineInterface, args: string, isFullscreen: boolean
   const cmd = args.trim()
   if (cmd === 'close') {
     await $.ui.close({ id: PANE })
-    return 'xdock closed. Commands keep running; /x shows them again.'
+    return 'The dock is closed. Commands keep running; /x shows them again.'
   }
-  // xdock shows every run: a process of this mod draws its output there, and one in a terminal pane is followed.
+  // The dock shows every run: a process of this mod draws its output there, and one in a terminal pane is followed.
   const run = cmd === '' ? undefined : await start($, cmd)
   const placed = await $.ui.open({ id: PANE, title: 'Run', focus: true, closeOnEscape: true, columns: DOCK_COLUMNS })
   showStatus($)
   // Docked beside the transcript only in the fullscreen layout; otherwise it sits above the prompt.
   const hint = placed.isPlaced && !isFullscreen ? ` ${DOCK_HINT}` : ''
-  if (cmd === '') return placed.isPlaced ? `xdock opened.${hint}` : 'xdock needs a wider terminal (about 110 columns) or the flicker-free display mode (CLAUDE_CODE_NO_FLICKER=1 claude).'
-  const where = run?.mux === 'hidden' ? ' (needs a terminal: press Attach in xdock)' : run?.mux ? ` (in ${run.mux === 'iterm' ? 'an iTerm2' : `a ${run.mux}`} pane beside Claude Code)` : ''
-  return `Started #${run?.id}: ${cmd}${where}${placed.isPlaced ? hint : ' (xdock needs a wider terminal to show it)'}`
+  if (cmd === '') return placed.isPlaced ? `The dock is open.${hint}` : 'The dock needs a wider terminal (about 110 columns) or the flicker-free display mode (CLAUDE_CODE_NO_FLICKER=1 claude).'
+  const where = run?.mux === 'hidden' ? ' (needs a terminal: press Attach in the dock)' : run?.mux ? ` (in ${run.mux === 'iterm' ? 'an iTerm2' : `a ${run.mux}`} pane beside Claude Code)` : ''
+  return `Started #${run?.id}: ${cmd}${where}${placed.isPlaced ? hint : ' (the dock needs a wider terminal to show it)'}`
 }
 
 const open = (id: number): Run | undefined => runs.find(run => run.id === id)
@@ -766,7 +766,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'x',
-      description: 'Run a command in xdock; with none, open the pane (/x close closes it)',
+      description: 'Run a command in the dock; with none, open the pane (/x close closes it)',
       argumentHint: '[command | close]',
       immediate: true,
     })
@@ -778,7 +778,7 @@ export const register: Register = on => {
     await $.tool.register({
       name: 'run_output',
       description:
-        'The latest output of a command the person started in xdock (a dev server, a test run). Give `run` as its number or part of its command; with none, the newest run.',
+        'The latest output of a command the person started in the dock (a dev server, a test run). Give `run` as its number or part of its command; with none, the newest run.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -802,7 +802,7 @@ export const register: Register = on => {
     const run = wanted
       ? runs.find(one => String(one.id) === wanted.replace(/^#/, '')) ?? [...runs].reverse().find(one => one.cmd.includes(wanted))
       : runs[runs.length - 1]
-    if (!run) return { result: runs.length === 0 ? 'Nothing has been run in xdock yet.' : `No run matches "${wanted}".` }
+    if (!run) return { result: runs.length === 0 ? 'Nothing has been run in the dock yet.' : `No run matches "${wanted}".` }
     const count = typeof e.lines === 'number' && e.lines > 0 ? Math.min(Math.floor(e.lines), 500) : 60
     const lines = run.log.tail(count)
     return {

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **The pane is called "the dock"** in the UI and the docs (xdock stays the name of the plugin), so sentences read "Opens the dock" and "The dock follows those runs", not "Opens xdock".
+
 ## 0.5.0
 
 - **Renamed from run-pane to xdock, and `/rp` is now `/x`; the Run pane is now xdock.** The plugin, marketplace (`jaichandra/xdock`), tool (`mcp__xdock__run_output`), config file (`hooks/xdock.json`), hidden tmux server (`tmux -L xdock`) and log files (`xdock-*.log`) carry the new name. `/rp` is gone.

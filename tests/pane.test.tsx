@@ -211,7 +211,7 @@ test('the pane closes from /x close and from its Close button, and the runs go o
   await gt($, 'npm run dev')
 
   const ran = await gt($, 'close')
-  expect(ran.text).toContain('xdock closed')
+  expect(ran.text).toContain('The dock is closed')
   expect(ran.text).not.toContain('Started')
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })

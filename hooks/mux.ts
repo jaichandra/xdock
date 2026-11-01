@@ -4,7 +4,7 @@
 
 // `iterm`: iTerm2, which splits its own panes (AppleScript) with no multiplexer in it. `hidden`: nothing of the
 // person's can split, so a tmux server of the mod's own (its own socket, never shown) holds the terminals, and
-// xdock is where they are followed.
+// the dock is where they are followed.
 export type Mux = 'herdr' | 'tmux' | 'iterm' | 'hidden'
 
 /** The variables that tell which multiplexer a session runs in. */

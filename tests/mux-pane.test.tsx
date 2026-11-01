@@ -226,7 +226,7 @@ test('in herdr /x splits a pane on the right, types the command as it is and sta
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
 
-  // xdock opens to follow it, and the reply says where it runs.
+  // The dock opens to follow it, and the reply says where it runs.
   machine.opened = []
   expect((await gt($, 'npm test')).text).toContain('Started #1: npm test (in a herdr pane beside Claude Code)')
   expect(machine.opened).toEqual(['run'])
@@ -370,7 +370,7 @@ test('where no pane can be made the command runs as a process of the mod, as wit
   machine.opened = []
   expect((await gt($, 'npm test')).text).toContain('Started #1: npm test')
   expect(machine.spawned).toHaveLength(1)
-  // Nothing else shows this run, so xdock opens.
+  // Nothing else shows this run, so the dock opens.
   expect(machine.opened).toEqual(['run'])
 })
 
@@ -423,7 +423,7 @@ test('/shell in tmux, and when the split fails it says why in one line', async (
   expect(said.text).toBe('Could not open a pane in tmux: no such session')
 })
 
-test('/x alone opens xdock in a multiplexer too', async ($, on) => {
+test('/x alone opens the dock in a multiplexer too', async ($, on) => {
   const machine = machineOf({ env: HERDR, opened: [] })
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
@@ -563,13 +563,13 @@ test('where pgrep cannot run the jobs are not assumed, and the pane is used agai
   expect(machine.calls.filter(argv => argv[2] === 'split')).toHaveLength(1)
 })
 
-test('without a multiplexer of the person\'s, a command runs in a window of a hidden tmux server and xdock follows it', async ($, on) => {
+test('without a multiplexer of the person\'s, a command runs in a window of a hidden tmux server and the dock follows it', async ($, on) => {
   const machine = machineOf({ hasTmux: true, screen: finishing() })
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
 
   machine.opened = []
-  // Nobody sees the hidden window, so xdock opens.
+  // Nobody sees the hidden window, so the dock opens.
   expect((await gt($, 'vi notes.txt')).text).toContain('Started #1')
   expect(machine.opened).toEqual(['run'])
   expect(machine.spawned).toEqual([])
@@ -750,7 +750,7 @@ test('Attach on a hidden terminal that has ended says so and opens no window', a
   await ui.unmount()
 })
 
-test('by default an ordinary command stays in xdock, even inside herdr, and asks for no terminal', async ($, on) => {
+test('by default an ordinary command stays in the dock, even inside herdr, and asks for no terminal', async ($, on) => {
   const machine = machineOf({ env: HERDR, hasTmux: true, settings: '{}' })
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
@@ -760,13 +760,13 @@ test('by default an ordinary command stays in xdock, even inside herdr, and asks
   expect(machine.calls.some(argv => argv[0] === 'herdr' || argv[0] === 'tmux')).toBe(false)
 })
 
-test('a command that needs a terminal gets one, and xdock lists it with an Attach next to it', async ($, on) => {
+test('a command that needs a terminal gets one, and the dock lists it with an Attach next to it', async ($, on) => {
   const machine = machineOf({ hasTmux: true, settings: '{}', screen: cmd => ({ text: `${PROMPT} ${cmd}\n`, isBusy: true }) })
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
   machine.opened = []
   const said = (await gt($, 'vim notes.txt')).text
-  expect(said).toContain('needs a terminal: press Attach in xdock')
+  expect(said).toContain('needs a terminal: press Attach in the dock')
   expect(machine.opened).toEqual(['run'])
   expect(machine.spawned).toEqual([])
 
@@ -776,7 +776,7 @@ test('a command that needs a terminal gets one, and xdock lists it with an Attac
   await ui.unmount()
 })
 
-test('in herdr a command that needs a terminal is typed into a pane beside Claude Code, and xdock says so', async ($, on) => {
+test('in herdr a command that needs a terminal is typed into a pane beside Claude Code, and the dock says so', async ($, on) => {
   const machine = machineOf({ env: HERDR, settings: '{}', screen: cmd => ({ text: `${PROMPT} ${cmd}\n`, isBusy: true }) })
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
