@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Errors and warnings are found by what they say.** `Error: ...`, `TypeError: ...`, `error: ...`, `ERR_NAME_NOT_RESOLVED`, `npm ERR!`, `DeprecationWarning: ...`, `warning: ...` and `deprecated` were missed (a colon has no word boundary after it, and the match was case-sensitive). Stack frames (`at fn (file:1:2)`) are dim, `==>` lines are banners, and a leading `[tag]` is coloured apart from the line.
+- **`hooks/run-pane.json` ships with `"forceColor": true`**, so tools that colour only for a terminal (webpack, npm, ...) colour in the pane.
+
 ## 0.4.1
 
 - **A row of space between the lines of suggestion buttons**, when they wrap.

@@ -158,6 +158,27 @@ test('a line of output is split into the kinds the pane colours', async () => {
   expect(highlight('WARN slow disk')).toEqual([{ text: 'WARN slow disk', kind: 'warning' }])
 })
 
+test('errors, warnings, stack frames, banners and tags are found by what they say', async () => {
+  const kindOf = (line: string) => highlight(line).find(part => part.kind !== 'border')?.kind
+  expect(kindOf('Error: net::ERR_NAME_NOT_RESOLVED at https://a.example')).toBe('error')
+  expect(kindOf('TypeError: x is not a function')).toBe('error')
+  expect(kindOf('src/a.c:3: error: expected ;')).toBe('error')
+  expect(kindOf('npm ERR! code ELIFECYCLE')).toBe('error')
+  expect(kindOf('(node:79865) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.')).toBe('warning')
+  expect(kindOf('gcc: warning: unused variable')).toBe('warning')
+  expect(kindOf('npm WARN deprecated foo@1.0.0')).toBe('warning')
+  expect(kindOf('    at navigate (/a/b/Frame.js:184:27)')).toBe('trace')
+  expect(kindOf('    at async CdpPage.goto (/a/Page.js:572:20)')).toBe('trace')
+  expect(kindOf('==> Generating proxy config: /a/b.js')).toBe('banner')
+  expect(kindOf('compiled with 0 errors')).toBe('plain')
+  expect(kindOf('at least one test ran')).toBe('plain')
+  expect(highlight('[sandbox] gateway login started')).toEqual([
+    { text: '[sandbox]', kind: 'tag' },
+    { text: ' gateway login started', kind: 'plain' },
+  ])
+  expect(highlight('[sandbox] Error: boom').map(part => part.kind)).toEqual(['tag', 'error'])
+})
+
 test('a URL keeps out the punctuation after it and there can be several in a line', async () => {
   const parts = highlight('see (https://a.example/x) and https://b.example/y.')
   expect(parts.filter(part => part.kind === 'url').map(part => part.text)).toEqual(['https://a.example/x', 'https://b.example/y'])

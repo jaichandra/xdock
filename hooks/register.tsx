@@ -77,6 +77,8 @@ const STYLE: Record<Exclude<PartKind, 'plain' | 'url'>, { color?: string; dimCol
   heading: { bold: true },
   error: { color: 'error' },
   warning: { color: 'warning' },
+  trace: { dimColor: true },
+  tag: { color: 'suggestion' },
 }
 
 // A button's face: the label on a light background with dark text, so it reads as a control on any theme.

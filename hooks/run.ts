@@ -308,7 +308,7 @@ export function matchesAny(text: string, patterns: readonly string[]): boolean {
   return patterns.some(pattern => pattern.trim() !== '' && lower.includes(pattern.trim().toLowerCase()))
 }
 
-export type PartKind = 'plain' | 'border' | 'url' | 'banner' | 'comment' | 'command' | 'heading' | 'error' | 'warning'
+export type PartKind = 'plain' | 'border' | 'url' | 'banner' | 'comment' | 'command' | 'heading' | 'error' | 'warning' | 'trace' | 'tag'
 
 export type Part = { text: string; kind: PartKind }
 
@@ -316,27 +316,39 @@ const FRAME = '\u2502\u2503\u2551\u250c\u2510\u2514\u2518\u256d\u256e\u2570\u256
 const FRAMED = new RegExp(`^([\\s${FRAME}]*)(.*?)([\\s${FRAME}]*)$`)
 const URL = /https?:\/\/[^\s\u2502\u2503\u2551<>"']+/g
 const COMMAND = /^(docker|docker-compose|curl|npm|npx|pnpm|yarn|make|cargo|git|kubectl|helm)\s/
-const ERROR = /\b(ERROR|FATAL|Error:|failed|Failed)\b/
-const WARNING = /\b(WARN|WARNING|warning:)\b/
+// Words that say a line is an error: the capitals of a log level, `Error:` and `TypeError:` and `error:` (a colon
+// ends them, and a colon has no word boundary after it), `ERR_NAME_NOT_RESOLVED` and `npm ERR!`.
+const ERROR = /\b(ERROR|FATAL|FAIL|FAILED|PANIC|failed|Failed)\b|\b\w*(Error|Exception):|\b(error|fatal):|\bERR_[A-Z_]+|\bERR!/
+const WARNING = /\b(WARN|WARNING|deprecated|DEPRECATED)\b|\b\w*([Ww]arning|warn):/
+// A line of a stack trace: `at fn (file:1:2)` or `at file:1:2`.
+const TRACE = /^at\s+(?:async\s+)?\S+\s+\(.*\)$|^at\s+\S*[/\\]\S*:\d+(?::\d+)?$/
+// The `[sandbox]` a tool puts in front of its lines.
+const TAG = /^\[[A-Za-z][\w .-]{0,19}\]/
 
-/** What a line of a command's output is, for colouring: its frame, URLs, `# notes`, `▶` banners,
- * command lines to copy, headings that end in a colon, and error and warning words. */
+/** What a line of a command's output is, for colouring: its frame, URLs, `# notes`, `▶` and `==>` banners,
+ * stack frames, `[tags]` in front, command lines to copy, error and warning words, and headings that end in a colon. */
 export function highlight(line: string): Part[] {
   const framed = FRAMED.exec(line)
   const [lead = '', core = line, tail = ''] = framed ? [framed[1], framed[2], framed[3]] : ['', line, '']
   const text = core.trim()
   const hasUrl = /https?:\/\//.test(core)
   let kind: PartKind = 'plain'
-  if (text.startsWith('\u25b6')) kind = 'banner'
+  if (text.startsWith('\u25b6') || text.startsWith('==>')) kind = 'banner'
   else if (text.startsWith('#')) kind = 'comment'
-  else if (COMMAND.test(text)) kind = 'command'
-  else if (text.endsWith(':') && !hasUrl) kind = 'heading'
+  else if (TRACE.test(text)) kind = 'trace'
   else if (ERROR.test(text)) kind = 'error'
   else if (WARNING.test(text)) kind = 'warning'
+  else if (COMMAND.test(text)) kind = 'command'
+  else if (text.endsWith(':') && !hasUrl) kind = 'heading'
 
   const parts: Part[] = []
   if (lead) parts.push({ text: lead, kind: 'border' })
   let at = 0
+  const tag = kind === 'plain' || kind === 'error' || kind === 'warning' ? TAG.exec(core) : null
+  if (tag) {
+    parts.push({ text: tag[0], kind: 'tag' })
+    at = tag[0].length
+  }
   for (const match of core.matchAll(URL)) {
     const index = match.index ?? 0
     // A URL does not end in the punctuation of the sentence around it.
