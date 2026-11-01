@@ -135,7 +135,7 @@ Programs it runs, all through the engine's `process` calls, in the folder of the
 - `ps`, `pgrep`, `kill` and `tail`, to see whether a pane's shell is idle, to find a run's background jobs and process tree, and to stop it.
 - `run_output` is a tool the plugin adds. It only returns the recent output of runs the plugin started; it does not stand in for any built-in tool.
 
-The plugin reads `hooks/xdock.json` and the folder's git remote (`git remote get-url origin`, for `openFor`) and writes a spool file of a run's output to a temporary folder, removed when the run is dropped.
+Files it reads, and what becomes of them: `hooks/xdock.json`, and `package.json`, `Makefile` and `Cargo.toml` in the session's folder, to suggest commands. They are read only to build the suggestions and settings shown in the dock; their contents are never put into a program's arguments, a command line or any request, and nothing is sent anywhere. The programs above are run with fixed arguments, plus the command you type, the pane or process ids, and the folder's path. The folder's git remote (`git remote get-url origin`) is read only to compare with `openFor` words on your machine. The plugin writes a spool file of a run's output to `$TMPDIR` (or `/tmp`), removed when the run is dropped.
 
 ## Optional: `hooks/xdock.json`
 
