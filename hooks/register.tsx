@@ -341,7 +341,9 @@ async function mirror($: EngineInterface, run: Run): Promise<string> {
       await flushSpool($, spool)
       if (run.status !== 'running') spoolTo($, run, `\n[run-pane] #${run.id} ${statusWords(run.status, run.code)}\n`)
     }
-    const line = `tail -n +1 -f -- ${shellQuote(run.spool.path)}`
+    // The window starts in the folder the command ran in, so what is typed there next is in the same place.
+    if (hasControls(run.cwd)) return "The run's folder has a control character in its name, so it is not typed into a terminal: open one there yourself."
+    const line = `cd -- ${shellQuote(run.cwd)} && tail -n +1 -f -- ${shellQuote(run.spool.path)}`
     const way = `Type this in a terminal (Ctrl+C there ends the viewing, not the run): ${line}`
     const system = await $.process.run(['uname', '-s'], { timeoutMs: 3_000 }).catch(() => undefined)
     if (system?.stdout.trim() !== 'Darwin') return way
@@ -897,21 +899,28 @@ export const register: Register = on => {
           </Text>
         )
       }
+      // Only the last piece may be cut (at the pane's edge, as a line with no link is): a piece before it that
+      // shrank would drop the middle of the line, such as the text in front of a URL.
       return (
         <Box>
           {pieces.map((piece, n) => {
             const style = textStyle(piece.span)
             const { link } = piece
+            const shrink = n === pieces.length - 1 ? 1 : 0
             return link ? (
-              <Button plain key={`link:${picked?.id}:${at}:${n}`} onPress={() => void openLink($, picked as Run, link)}>
-                <Text {...style} color={style.color ?? 'suggestion'} underline>
+              <Box key={`piece:${at}:${n}`} flexShrink={shrink}>
+                <Button plain key={`link:${picked?.id}:${at}:${n}`} onPress={() => void openLink($, picked as Run, link)}>
+                  <Text {...style} color={style.color ?? 'suggestion'} underline wrap="truncate-end">
+                    {piece.text}
+                  </Text>
+                </Button>
+              </Box>
+            ) : (
+              <Box key={`text:${at}:${n}`} flexShrink={shrink}>
+                <Text {...style} wrap="truncate-end">
                   {piece.text}
                 </Text>
-              </Button>
-            ) : (
-              <Text {...style} wrap="truncate-end">
-                {piece.text}
-              </Text>
+              </Box>
             )
           })}
         </Box>

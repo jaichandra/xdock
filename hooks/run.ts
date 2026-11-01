@@ -18,12 +18,19 @@ const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u00
 const NOT_SGR = /\u001b\[[0-9;?]*[ -/]*[@-ln-~]|\u001b\[[0-9;?]*[ -/]+m|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[@-Z\\-_]/g
 const STRAY_ESC = /\u001b(?!\[[0-9;:]*m)/g
 // Control characters but ESC, which the sequences kept above start with.
+// An escape sequence that has begun and not ended: the chunk stopped inside it, and the rest comes with the next.
+const UNFINISHED = /\u001b(?:\[[0-9;:?]*[ -/]*|\][^\u0007\u001b]*\u001b?)?$/
+const MAX_UNFINISHED = 256
 const CONTROLS = /[\u0000-\u0008\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f-\u009f]/g
 
 export const stripAnsi = (text: string): string => text.replace(ANSI, '')
 
-/** A progress bar redraws its line with `\r`: only what is left after the last one shows. */
-const afterReturn = (line: string): string => line.slice(line.lastIndexOf('\r') + 1).replace(CONTROLS, '')
+/** A progress bar redraws its line with `\r`: only what is left after the last one shows. A `\r` that ends the line
+ * (`\r\n`, or a chunk that stops there) redraws nothing, so it is not the last one: the line keeps its text. */
+const afterReturn = (line: string): string => {
+  const text = line.replace(/\r+$/, '')
+  return text.slice(text.lastIndexOf('\r') + 1).replace(CONTROLS, '')
+}
 
 /** A line of output as the log keeps it: its text with its colour sequences, and the style it starts in. */
 export type LogLine = { text: string; start: Style }
@@ -33,13 +40,22 @@ export type LogLine = { text: string; start: Style }
 export class RunLog {
   private lines: LogLine[] = []
   private partial = ''
+  private pending = ''
   // The style at the end of the last whole line: where the next one starts.
   private style: Style = {}
   // How many lines went off the top, so a line has a number that does not change as new ones arrive.
   private gone = 0
 
   push(text: string): void {
-    const parts = (this.partial + text.replace(NOT_SGR, '').replace(STRAY_ESC, '')).split('\n')
+    // A sequence cut in two by the chunks is read whole, not as a stray escape and the letters after it.
+    let raw = this.pending + text
+    this.pending = ''
+    const cut = UNFINISHED.exec(raw)
+    if (cut && raw.length - cut.index <= MAX_UNFINISHED) {
+      this.pending = cut[0]
+      raw = raw.slice(0, cut.index)
+    }
+    const parts = (this.partial + raw.replace(NOT_SGR, '').replace(STRAY_ESC, '')).split('\n')
     this.partial = parts.pop() ?? ''
     for (const part of parts) {
       this.lines.push({ text: afterReturn(part), start: this.style })
@@ -85,6 +101,7 @@ export class RunLog {
   clear(): void {
     this.lines = []
     this.partial = ''
+    this.pending = ''
     this.style = {}
     this.gone = 0
   }

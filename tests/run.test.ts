@@ -42,6 +42,23 @@ test('a progress bar that redraws with a carriage return shows its last state', 
   expect(log.tail(5)).toEqual(['100%', 'done'])
 })
 
+test('a line that ends with a carriage return keeps its text', async () => {
+  const log = new RunLog()
+  log.push('Error: net::ERR_NAME_NOT_RESOLVED\r\nnext\r')
+  expect(log.tail(5)).toEqual(['Error: net::ERR_NAME_NOT_RESOLVED', 'next'])
+  log.push('\n')
+  expect(log.tail(5)).toEqual(['Error: net::ERR_NAME_NOT_RESOLVED', 'next'])
+})
+
+test('an escape sequence cut in two by the chunks is not shown as text', async () => {
+  const log = new RunLog()
+  log.push('a\u001b[2')
+  log.push('Kb \u001b[3')
+  log.push('1mred\u001b[0m\n')
+  expect(log.tail(5)).toEqual(['ab red'])
+  expect(log.styled(1)[0]?.text).toBe('ab \u001b[31mred\u001b[0m')
+})
+
 test('a log keeps the last lines only', async () => {
   const log = new RunLog()
   for (let at = 0; at < MAX_LINES + 50; at++) log.push(`line ${at}\n`)

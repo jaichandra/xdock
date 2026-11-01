@@ -496,7 +496,7 @@ test('Open in shell on a process of the plugin opens a window with all its outpu
   expect(path).toMatch(/^\/tmp\/run-pane-[a-z0-9]+-1\.log$/)
   // The window tails it from its first line: all so far, then live. The path is quoted, never part of a script.
   const window = process.calls.find(argv => argv[0] === 'osascript')
-  expect(window?.slice(3)).toEqual(['--', `tail -n +1 -f -- '${path}'`, '#1 npm run dev'])
+  expect(window?.slice(3)).toEqual(['--', `cd -- '/w/sample-app' && tail -n +1 -f -- '${path}'`, '#1 npm run dev'])
   expect(process.toasts.some(text => text.includes("Opened #1's output in Terminal") && text.includes('does not reach the process'))).toBe(true)
   await ui.unmount()
 })
