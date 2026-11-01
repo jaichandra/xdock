@@ -312,7 +312,7 @@ export type PartKind = 'plain' | 'border' | 'url' | 'banner' | 'comment' | 'comm
 
 export type Part = { text: string; kind: PartKind }
 
-const FRAME = '\u2502\u2503\u2551\u250c\u2510\u2514\u2518\u256d\u256e\u2570\u256f\u2500'
+const FRAME = '│┃║┌┐└┘╭╮╰╯─'
 const FRAMED = new RegExp(`^([\\s${FRAME}]*)(.*?)([\\s${FRAME}]*)$`)
 const URL = /https?:\/\/[^\s\u2502\u2503\u2551<>"']+/g
 const COMMAND = /^(docker|docker-compose|npm|npx|pnpm|yarn|make|cargo|git|kubectl|helm)\s/
