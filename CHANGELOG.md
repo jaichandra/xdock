@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- **A row of space between the lines of suggestion buttons**, when they wrap.
+
 ## 0.4.0
 
 The Run pane is where commands run, with their colours and links; a terminal is for the ones that need one.

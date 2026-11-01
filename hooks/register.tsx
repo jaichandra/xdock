@@ -867,7 +867,9 @@ export const register: Register = on => {
     // wraps (the hint, the buttons), so scrolling stops with the first line at the top, not past it.
     // The suggestions are chips that wrap: about as many rows as their width fills.
     const hintWidth = 4 + groupSuggestions(hints).reduce((sum, group) => sum + (group.prefix ? group.prefix.length + 1 : 0) + group.items.reduce((inner, item) => inner + item.label.length + 3, 0), 0)
-    const hintRows = hints.length > 0 ? Math.max(1, Math.ceil(hintWidth / Math.max(20, e.props.bodyColumns - 2))) + 1 : 0
+    const hintLines = hints.length > 0 ? Math.max(1, Math.ceil(hintWidth / Math.max(20, e.props.bodyColumns - 2))) : 0
+    // A row of space between the lines of buttons too.
+    const hintRows = hints.length > 0 ? hintLines * 2 : 0
     const chrome =
       1 + 1 + (e.props.placement === 'inline' ? 4 : 0) + 1 + (hints.length > 0 ? 1 : 0) + hintRows + Math.max(1, runs.length) + 3 + (e.props.bodyColumns < 80 ? 2 : 1)
     const visible = Math.max(1, rows - chrome)
@@ -1012,7 +1014,7 @@ export const register: Register = on => {
         {hints.length > 0 && <Text> </Text>}
         {hints.length > 0 && (
           // One row high, as the buttons at the bottom are: the words they share once, then a button each.
-          <Box flexWrap="wrap" columnGap={1}>
+          <Box flexWrap="wrap" columnGap={1} rowGap={1}>
             <Text dimColor>Try</Text>
             {groupSuggestions(hints).flatMap(group => [
               ...(group.prefix ? [<Text dimColor key={`prefix:${group.prefix}:${group.items[0]?.cmd}`}>{group.prefix}</Text>] : []),
