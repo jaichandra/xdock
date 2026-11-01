@@ -163,7 +163,7 @@ async function openIfWanted($: EngineInterface): Promise<void> {
   const cwd = await $.session.cwd()
   let remote = ''
   try {
-    remote = (await $.process.run(['git', '-C', cwd, 'remote', 'get-url', 'origin'], { timeoutMs: 3_000 })).stdout
+    remote = (await $.process.run(['git', 'remote', 'get-url', 'origin'], { cwd, timeoutMs: 3_000 })).stdout
   } catch {
     // Not a repository, or git is not there: the path alone decides.
   }
