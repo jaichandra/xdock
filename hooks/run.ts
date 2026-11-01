@@ -315,7 +315,7 @@ export type Part = { text: string; kind: PartKind }
 const FRAME = '\u2502\u2503\u2551\u250c\u2510\u2514\u2518\u256d\u256e\u2570\u256f\u2500'
 const FRAMED = new RegExp(`^([\\s${FRAME}]*)(.*?)([\\s${FRAME}]*)$`)
 const URL = /https?:\/\/[^\s\u2502\u2503\u2551<>"']+/g
-const COMMAND = /^(docker|docker-compose|curl|npm|npx|pnpm|yarn|make|cargo|git|kubectl|helm)\s/
+const COMMAND = /^(docker|docker-compose|npm|npx|pnpm|yarn|make|cargo|git|kubectl|helm)\s/
 // Words that say a line is an error: the capitals of a log level, `Error:` and `TypeError:` and `error:` (a colon
 // ends them, and a colon has no word boundary after it), `ERR_NAME_NOT_RESOLVED` and `npm ERR!`.
 const ERROR = /\b(ERROR|FATAL|FAIL|FAILED|PANIC|failed|Failed)\b|\b\w*(Error|Exception):|\b(error|fatal):|\bERR_[A-Z_]+|\bERR!/

@@ -6,6 +6,5 @@
     "name": "jaichandra"
   },
   "license": "MIT",
-  "types": "./types/index.d.ts",
   "keywords": ["mod", "pane", "run", "dev-server"]
 }

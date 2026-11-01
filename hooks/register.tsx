@@ -532,7 +532,7 @@ async function startInPane($: EngineInterface, run: Run, mux: Mux, stopped: Prom
   return true
 }
 
-async function start($: EngineInterface, cmd: string): Promise<Run> {
+async function startRun($: EngineInterface, cmd: string): Promise<Run> {
   back = 0
   const run: Run = { id: ++seq, cmd, cwd: await $.session.cwd(), status: 'running', code: null, log: new RunLog() }
   runs.push(run)
@@ -653,7 +653,7 @@ async function runPrompt($: EngineInterface, args: string, isFullscreen: boolean
     return 'The dock is closed. Commands keep running; /x shows them again.'
   }
   // The dock shows every run: a process of this mod draws its output there, and one in a terminal pane is followed.
-  const run = cmd === '' ? undefined : await start($, cmd)
+  const run = cmd === '' ? undefined : await startRun($, cmd)
   const placed = await $.ui.open({ id: PANE, title: 'Run', focus: true, closeOnEscape: true, columns: DOCK_COLUMNS })
   showStatus($)
   // Docked beside the transcript only in the fullscreen layout; otherwise it sits above the prompt.
@@ -860,7 +860,7 @@ export const register: Register = on => {
       const text = cmd.trim()
       if (text === '') return
       void update($, draft, () => '')
-      void start($, text)
+      void startRun($, text)
     }
 
     // The pane scrolls as a whole (wheel, or the keys while it has the focus), so the output is
@@ -952,7 +952,7 @@ export const register: Register = on => {
             onPress={() => {
               runs.splice(runs.indexOf(picked), 1)
               dropSpool($, picked)
-              void start($, picked.cmd)
+              void startRun($, picked.cmd)
             }}
           >
             {face('Restart', 'primary', `restart:${picked.id}`)}

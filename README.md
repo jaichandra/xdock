@@ -123,6 +123,20 @@ Elsewhere `/shell` says so and does nothing. The folder (for the macOS window) i
 
 A tool for Claude, not for you: `mcp__xdock__run_output`. It returns the last lines of a run (60 by default, 500 at most) with its status. Give `run` as the run's number or a part of its command; with none, the newest run. Claude sees a run's output only when it calls this tool.
 
+## What it runs and what it sends
+
+Nothing leaves your machine: the plugin makes no network requests, has no telemetry and sends no file or output anywhere. Output goes to the dock, to a terminal pane or window you opened, and, when Claude calls `run_output`, back to Claude as that tool's result.
+
+Programs it runs, all through the engine's `process` calls, in the folder of the session:
+
+- `sh -c` (a login `sh -lc`), to run the command you give `/x`. This is the point of the plugin: the command is yours, typed at the prompt or into the dock. The plugin does not fetch or generate commands of its own.
+- `tmux` and `herdr`, to split, read, type into, interrupt and close panes, only when you are inside them (or, for tmux, in its own hidden server with a private socket) and `multiplexer` is not `false`.
+- `osascript`, on macOS only, to drive iTerm2 panes and to open a Terminal window for `/shell` and for a run's output. Scripts are fixed text; values go in as arguments.
+- `ps`, `pgrep`, `kill` and `tail`, to see whether a pane's shell is idle, to find a run's background jobs and process tree, and to stop it.
+- `run_output` is a tool the plugin adds. It only returns the recent output of runs the plugin started; it does not stand in for any built-in tool.
+
+The plugin reads `hooks/xdock.json` and the folder's git remote (`git remote get-url origin`, for `openFor`) and writes a spool file of a run's output to a temporary folder, removed when the run is dropped.
+
 ## Optional: `hooks/xdock.json`
 
 The mod needs no configuration. If you bundle it into your own tooling you can drop a `hooks/xdock.json` next to `hooks/register.tsx` (a copy installed from this repository has none):
