@@ -67,12 +67,12 @@ export class RunLog {
     }
   }
 
-  get size(): number {
+  size(): number {
     return this.lines.length + (this.partial ? 1 : 0)
   }
 
   /** How many lines went off the top: the number of the first line held. */
-  get first(): number {
+  first(): number {
     return this.gone
   }
 

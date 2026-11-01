@@ -102,18 +102,27 @@ let isRedrawQueued = false
 let back = 0
 let newest = 0
 
+async function pollWait($: EngineInterface): Promise<'poll'> {
+  await $.clock.sleep(POLL_MS)
+  return 'poll'
+}
+
+async function toastOf($: EngineInterface, text: Promise<string>): Promise<void> {
+  $.ui.toast(await text)
+}
+
 function redraw($: EngineInterface): void {
   if (isRedrawQueued) return
   isRedrawQueued = true
-  void $.clock
-    .sleep(REDRAW_MS)
-    .then(() => {
+  void (async () => {
+    try {
+      await $.clock.sleep(REDRAW_MS)
       isRedrawQueued = false
-      return update($, rev, n => n + 1)
-    })
-    .catch(() => {
+      await update($, rev, n => n + 1)
+    } catch {
       isRedrawQueued = false
-    })
+    }
+  })()
 }
 
 function showStatus($: EngineInterface): void {
@@ -253,10 +262,13 @@ let hasTmux: Promise<boolean> | undefined
 // iTerm2 could not. Asked when it is needed, not before.
 async function canHide($: EngineInterface): Promise<boolean> {
   if ((await settings($)).multiplexer === false) return false
-  hasTmux ??= $.process.run(TMUX_VERSION, { timeoutMs: 3_000 }).then(
-    ran => ran.exitCode === 0,
-    () => false,
-  )
+  hasTmux ??= (async () => {
+    try {
+      return (await $.process.run(TMUX_VERSION, { timeoutMs: 3_000 })).exitCode === 0
+    } catch {
+      return false
+    }
+  })()
   return hasTmux
 }
 
@@ -315,7 +327,14 @@ function spoolTo($: EngineInterface, run: Run, text: string): void {
   spool.buffer += text
   if (spool.isFlushing) return
   spool.isFlushing = true
-  void $.clock.sleep(SPOOL_MS).then(() => flushSpool($, spool), () => flushSpool($, spool))
+  void (async () => {
+    try {
+      await $.clock.sleep(SPOOL_MS)
+    } catch {
+      // flush anyway
+    }
+    await flushSpool($, spool)
+  })()
 }
 
 function dropSpool($: EngineInterface, run: Run): void {
@@ -490,7 +509,7 @@ async function startInPane($: EngineInterface, run: Run, mux: Mux, stopped: Prom
     let misses = 0
     let last: string | undefined
     for (;;) {
-      if ((await Promise.race([$.clock.sleep(POLL_MS).then(() => 'poll' as const), stopped])) === 'stop') {
+      if ((await Promise.race([pollWait($), stopped])) === 'stop') {
         finish($, run, 'stopped', null)
         return
       }
@@ -674,10 +693,14 @@ const resolveFile = (cwd: string, path: string, home: string | undefined): strin
 
 // What opens a URL or a file on this machine, from the system's own name: `open` on macOS, `xdg-open` elsewhere.
 function openerOf($: EngineInterface): Promise<string | undefined> {
-  opener ??= $.process.run(['uname', '-s'], { timeoutMs: 3_000 }).then(
-    ran => (ran.stdout.trim() === 'Darwin' ? 'open' : ran.stdout.trim() === 'Linux' ? 'xdg-open' : undefined),
-    () => undefined,
-  )
+  opener ??= (async () => {
+    try {
+      const name = (await $.process.run(['uname', '-s'], { timeoutMs: 3_000 })).stdout.trim()
+      return name === 'Darwin' ? 'open' : name === 'Linux' ? 'xdg-open' : undefined
+    } catch {
+      return undefined
+    }
+  })()
   return opener
 }
 
@@ -806,7 +829,7 @@ export const register: Register = on => {
     const count = typeof e.lines === 'number' && e.lines > 0 ? Math.min(Math.floor(e.lines), 500) : 60
     const lines = run.log.tail(count)
     return {
-      result: [`#${run.id} ${run.cmd} (${statusWords(run.status, run.code)}), last ${lines.length} of ${run.log.size} lines:`, ...lines].join('\n'),
+      result: [`#${run.id} ${run.cmd} (${statusWords(run.status, run.code)}), last ${lines.length} of ${run.log.size()} lines:`, ...lines].join('\n'),
     }
   })
 
@@ -877,7 +900,7 @@ export const register: Register = on => {
     const chrome =
       1 + 1 + (e.props.placement === 'inline' ? 4 : 0) + 1 + (hints.length > 0 ? 1 : 0) + hintRows + Math.max(1, runs.length) + 3 + (e.props.bodyColumns < 80 ? 2 : 1)
     const visible = Math.max(1, rows - chrome)
-    newest = Math.max(0, (picked?.log.size ?? 0) - visible)
+    newest = Math.max(0, (picked?.log.size() ?? 0) - visible)
     back = Math.min(back, newest)
     // The lines ending `back` before the newest, newest first: drawn from the bottom up, so what
     // does not fit is cut at the top.
@@ -888,7 +911,7 @@ export const register: Register = on => {
     if (picked) lookUp($, picked, shown.map(line => stripAnsi(line.text)))
     const homeDir = await home$($)
     const isFile = (path: string): boolean => picked !== undefined && known.get(resolveFile(picked.cwd, path, homeDir)) === true
-    const output = shown.map((line, at) => ({ line, at: (picked?.log.first ?? 0) + firstShown + at })).reverse()
+    const output = shown.map((line, at) => ({ line, at: (picked?.log.first() ?? 0) + firstShown + at })).reverse()
 
     // One line of the output: its colours and styles, and its URLs and files as presses that open them.
     const drawLine = ({ line, at }: { line: LogLine; at: number }): JSX.Element => {
@@ -987,7 +1010,7 @@ export const register: Register = on => {
           </Button>
         )}
         {/* The selected run's terminal, or a shell with its command; with no run, a shell in the folder. */}
-        <Button plain key={`shell`} label="Open in shell" onPress={() => void (picked ? openInShell($, picked) : openShell($)).then(text => $.ui.toast(text))}>
+        <Button plain key={`shell`} label="Open in shell" onPress={() => void toastOf($, picked ? openInShell($, picked) : openShell($))}>
           {face('Open in shell', 'primary', 'shell')}
         </Button>
         <Button plain key={`close`} label="Close pane" onPress={() => void $.ui.close({ id: PANE })}>
@@ -1055,7 +1078,7 @@ export const register: Register = on => {
             <Text dimColor> {run.isStopping && run.status === 'running' ? 'stopping\u2026' : statusWords(run.status, run.code)}</Text>
             {run.mux === 'hidden' && run.status === 'running' && <Text> </Text>}
             {run.mux === 'hidden' && run.status === 'running' && (
-              <Button plain key={`attach:${run.id}`} label="Attach" onPress={() => void attach($, run).then(text => $.ui.toast(text))}>
+              <Button plain key={`attach:${run.id}`} label="Attach" onPress={() => void toastOf($, attach($, run))}>
                 {face('Attach', 'primary', `attach:${run.id}`)}
               </Button>
             )}
@@ -1066,13 +1089,13 @@ export const register: Register = on => {
         {picked && (
           <Box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={3} borderStyle="round" borderDimColor paddingX={1}>
             <Text dimColor wrap="truncate-end">
-              #{picked.id} output ({picked.log.size} lines{back > 0 ? `, ${back} back` : ''})
+              #{picked.id} output ({picked.log.size()} lines{back > 0 ? `, ${back} back` : ''})
             </Text>
             {picked.mux === 'hidden' && picked.status === 'running' && <Text dimColor>Needs a terminal: press Attach (next to the run above) to type into it.</Text>}
             <Box flexDirection="column-reverse" flexGrow={1} flexShrink={1} overflow="hidden">
             {/* First, so at the bottom: it takes the room the lines leave, which keeps a short output at the top. */}
             <Box flexGrow={1} />
-            {picked.log.size === 0 && <Text dimColor>No output yet.</Text>}
+            {picked.log.size() === 0 && <Text dimColor>No output yet.</Text>}
             {output.map(drawLine)}
             </Box>
           </Box>

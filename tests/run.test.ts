@@ -32,7 +32,7 @@ test('a log joins pieces into lines and shows an unfinished one', async () => {
   log.push('first\nsec')
   log.push('ond\nthi')
   expect(log.tail(10)).toEqual(['first', 'second', 'thi'])
-  expect(log.size).toBe(3)
+  expect(log.size()).toBe(3)
   expect(log.tail(2)).toEqual(['second', 'thi'])
 })
 
@@ -62,11 +62,11 @@ test('an escape sequence cut in two by the chunks is not shown as text', async (
 test('a log keeps the last lines only', async () => {
   const log = new RunLog()
   for (let at = 0; at < MAX_LINES + 50; at++) log.push(`line ${at}\n`)
-  expect(log.size).toBe(MAX_LINES)
+  expect(log.size()).toBe(MAX_LINES)
   expect(log.tail(1)).toEqual([`line ${MAX_LINES + 49}`])
   expect(log.tail(MAX_LINES + 100)[0]).toBe('line 50')
   log.clear()
-  expect(log.size).toBe(0)
+  expect(log.size()).toBe(0)
 })
 
 test('package scripts come as npm run, the usual ones first', async () => {
@@ -219,13 +219,13 @@ test('a style runs on into the next lines until it is reset, and a progress bar 
 
 test('lines have a number that does not change when the oldest go off the top', () => {
   const log = new RunLog()
-  expect(log.first).toBe(0)
+  expect(log.first()).toBe(0)
   log.push(`${Array.from({ length: MAX_LINES + 5 }, (_, at) => `line ${at}`).join('\n')}\n`)
-  expect(log.first).toBe(5)
+  expect(log.first()).toBe(5)
   expect(log.tail(1)).toEqual([`line ${MAX_LINES + 4}`])
   log.clear()
-  expect(log.first).toBe(0)
-  expect(log.size).toBe(0)
+  expect(log.first()).toBe(0)
+  expect(log.size()).toBe(0)
 })
 
 test('editors, pagers, monitors, sessions and REPLs need a terminal; builds, tests and scripts do not', () => {
