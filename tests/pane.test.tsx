@@ -28,7 +28,7 @@ const gt = async ($: Parameters<Parameters<typeof test>[1]>[0], args: string) =>
 // Stands for the engine beneath the mod: the calls the mod makes are answered here.
 function engine(
   on: On,
-  process: { calls: string[][]; lines: string[]; remote?: string; opened?: string[]; toasts?: string[]; writes?: { argv: string[]; stdin?: string | undefined }[]; later?: { gate: Promise<void>; lines: string[] }; isFsHung?: boolean; spawns?: { argv: readonly string[]; env?: Record<string, string> | undefined }[]; existing?: string[] },
+  process: { calls: string[][]; lines: string[]; remote?: string; opened?: string[]; toasts?: string[]; writes?: { argv: string[]; stdin?: string | undefined }[]; later?: { gate: Promise<void>; lines: string[] }; isFsHung?: boolean; spawns?: { argv: readonly string[]; env?: Record<string, string> | undefined }[]; existing?: string[]; system?: string; env?: Record<string, string> },
   files: Record<string, string> = { 'package.json': '{"scripts":{"dev":"vite","test":"vitest"}}' },
 ) {
   on('command.register', (_, e) => ({ value: { command: e.name } }))
@@ -60,7 +60,7 @@ function engine(
     if (e.init?.stdin !== undefined) process.writes?.push({ argv: [...e.argv], stdin: e.init.stdin })
     // No tmux here: the commands are processes of the mod.
     if (e.argv[0] === 'tmux') return { value: { exitCode: 127, stdout: '', stderr: 'tmux: not found', isStdoutTruncated: false, isStderrTruncated: false } }
-    if (e.argv[0] === 'uname') return { value: { exitCode: 0, stdout: 'Darwin\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    if (e.argv[0] === 'uname') return { value: { exitCode: 0, stdout: `${process.system ?? 'Darwin'}\n`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     if (e.argv[0] === 'git') return { value: { exitCode: 0, stdout: process.remote ?? '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     if (e.argv[0] === 'ps') return { value: { exitCode: 0, stdout: ' 4242 1\n 4243 4242\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -70,7 +70,7 @@ function engine(
     if (process.isFsHung) await new Promise<void>(() => undefined)
     return { value: process.existing?.includes(e.path) === true }
   })
-  on('env.get', (_, e) => ({ value: e.name === 'HOME' ? '/Users/me' : undefined }))
+  on('env.get', (_, e) => ({ value: e.name === 'HOME' ? '/Users/me' : process.env?.[e.name] }))
   on('process.spawn', async function* (_, e) {
     process.spawns?.push({ argv: e.argv, env: e.env })
     yield { stream: 'stderr' as const, text: '@@xdock-pid 4242\n' }
@@ -498,6 +498,25 @@ test('Open in shell on a process of the plugin opens a window with all its outpu
   const window = process.calls.find(argv => argv[0] === 'osascript')
   expect(window?.slice(3)).toEqual(['--', `cd -- '/w/sample-app' && tail -n +1 -f -- '${path}'`, '#1 npm run dev'])
   expect(process.toasts.some(text => text.includes("Opened #1's output in Terminal") && text.includes('does not reach the process'))).toBe(true)
+  await ui.unmount()
+})
+
+test('Open in shell on a process of the plugin opens a window of a terminal emulator on Linux, following the same file', async ($, on) => {
+  const process = { calls: [] as string[][], lines: ['one\n', 'partial'], toasts: [] as string[], writes: [] as { argv: string[]; stdin?: string | undefined }[], system: 'Linux', env: { DISPLAY: ':0' } }
+  engine(on, process)
+  await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
+  await gt($, 'npm run dev')
+  await untilPrinted($, 'partial')
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'shell' })
+  await new Promise<void>(resolve => setTimeout(resolve, 60))
+  // The stub says every program exists, so the first one tried opens.
+  const window = process.calls.find(argv => argv[0] === 'sh' && String(argv[2]).includes('command -v'))
+  expect(window?.slice(4, 8)).toEqual(['x-terminal-emulator', '-T', '#1 npm run dev', '-e'])
+  expect(window?.[10]).toMatch(/^cd -- '\/w\/sample-app' && tail -n \+1 -f -- '\/tmp\/xdock-[a-z0-9]+-1\.log' \|\|/)
+  expect(process.calls.some(argv => argv[0] === 'osascript')).toBe(false)
+  expect(process.toasts.some(text => text.includes("Opened #1's output in x-terminal-emulator"))).toBe(true)
   await ui.unmount()
 })
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **`/shell` and Open in shell open a terminal window on Linux** the way Attach does (a screen, outside herdr and tmux; the first terminal emulator installed). `/shell` starts `$SHELL` in the session's folder; Open in shell follows the run's output.
 - **Attach opens a terminal window on Linux.** With a screen (`DISPLAY` or `WAYLAND_DISPLAY`) and outside herdr and tmux, Attach opens a window of the first terminal emulator installed: `$TERMINAL` when it is a plain program name, then `x-terminal-emulator`, `gnome-terminal`, `konsole`, `xfce4-terminal`, `alacritty`, `kitty`, `xterm`. If none opens, the button still gives the line to type.
 - **The line to attach stays in the dock.** Under a run that needs a terminal, the dim hint now includes `env -u TMUX tmux -L xdock attach -t xdock`, so it can be copied into another terminal or SSH session after the toast is gone.
 

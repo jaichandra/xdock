@@ -15,6 +15,10 @@ type Machine = {
   /** How the stubbed osascript ends: an answer, or a command that cannot start. */
   osascript?: { exitCode: number; stdout?: string; stderr?: string } | 'cannot-start'
   cwd?: string
+  /** Environment variables (`DISPLAY`, `TERMINAL`), for a window on Linux. */
+  env?: Record<string, string>
+  /** The terminal emulators installed (Linux). */
+  terminals?: string[]
 }
 
 type Seen = { calls: string[][]; exists: string[]; toasts: string[]; cwd: string }
@@ -34,7 +38,7 @@ const done = (stdout = '', stderr = '', exitCode = 0) => ({ value: { exitCode, s
 // Stands for the engine beneath the mod. A command that cannot start answers `{ deny }`, which is how a
 // call on `$` rejects.
 function engine(on: On, machine: Machine = {}): Seen {
-  const { system = 'Darwin', isItermInstalled = false, osascript = { exitCode: 0 }, cwd = '/w/sample-app', termProgram } = machine
+  const { system = 'Darwin', isItermInstalled = false, osascript = { exitCode: 0 }, cwd = '/w/sample-app', termProgram, env = {}, terminals = [] } = machine
   const seen: Seen = { calls: [], exists: [], toasts: [], cwd }
   on('command.register', () => ({ value: { command: 'shell' } }))
   on('tool.register', () => ({ value: { tool: 'mcp__xdock__run_output' } }))
@@ -50,7 +54,7 @@ function engine(on: On, machine: Machine = {}): Seen {
   on('fs.read', () => {
     throw new Error('missing')
   })
-  on('env.get', (_, e) => ({ value: e.name === 'TERM_PROGRAM' ? termProgram : undefined }))
+  on('env.get', (_, e) => ({ value: e.name === 'TERM_PROGRAM' ? termProgram : env[e.name] }))
   on('fs.exists', (_, e) => {
     seen.exists.push(e.path)
     return { value: e.path === ITERM_PATH && isItermInstalled }
@@ -61,6 +65,7 @@ function engine(on: On, machine: Machine = {}): Seen {
       if (system === null) return { deny: 'spawn uname ENOENT' }
       return done(`${system}\n`)
     }
+    if (e.argv[0] === 'sh' && String(e.argv[2]).includes('command -v')) return terminals.includes(String(e.argv[4])) ? done() : done('', '', 127)
     if (e.argv[0] === 'osascript') {
       if (osascript === 'cannot-start') return { deny: 'spawn osascript ENOENT' }
       return done(osascript.stdout ?? '', osascript.stderr ?? '', osascript.exitCode)
@@ -175,6 +180,41 @@ test('off macOS /shell says so in one line and starts nothing', async ($, on) =>
   expect(text).not.toContain('\n')
   expect(osascripts(seen)).toEqual([])
   expect(seen.exists).toEqual([])
+})
+
+const windows = (seen: Seen): string[][] => seen.calls.filter(argv => argv[0] === 'sh')
+
+test('on Linux with a screen /shell opens a window of the first terminal installed, in the folder', async ($, on) => {
+  const seen = engine(on, { system: 'Linux', env: { DISPLAY: ':0' }, terminals: ['konsole', 'xterm'] })
+  const text = await runShell($, '/w/sample-app')
+
+  expect(text).toBe('Opened a shell window in konsole: /w/sample-app')
+  expect(windows(seen).map(argv => argv[4])).toEqual(['x-terminal-emulator', 'gnome-terminal', 'konsole'])
+  const window = windows(seen)[2]!
+  expect(window.slice(4, 8)).toEqual(['konsole', '-p', 'tabtitle=sample-app', '-e'])
+  expect(window[10]).toMatch(/^cd -- '\/w\/sample-app' && exec "\$\{SHELL:-sh\}" \|\|/)
+  expect(osascripts(seen)).toEqual([])
+})
+
+test('on Linux a folder name is quoted into the window\'s line, never run', async ($, on) => {
+  const seen = engine(on, { system: 'Linux', env: { WAYLAND_DISPLAY: 'wayland-0' }, terminals: ['xterm'], cwd: "/w/it's $(x)" })
+  await runShell($, "/w/it's $(x)")
+
+  const window = windows(seen).find(argv => argv[4] === 'xterm')!
+  expect(window[10]).toContain(`cd -- '/w/it'\\''s $(x)' && exec`)
+})
+
+test('on Linux a folder name with a control character is not typed into a window', async ($, on) => {
+  const seen = engine(on, { system: 'Linux', env: { DISPLAY: ':0' }, terminals: ['xterm'], cwd: '/w/line\nbreak' })
+  const text = await runShell($, '/w/line\nbreak')
+
+  expect(text).toBe(NOT_MACOS)
+  expect(windows(seen)).toEqual([])
+})
+
+test('on Linux with a screen but no terminal installed /shell says to open one yourself', async ($, on) => {
+  engine(on, { system: 'Linux', env: { DISPLAY: ':0' }, terminals: [] })
+  expect(await runShell($, '/w/sample-app')).toBe(NOT_MACOS)
 })
 
 test('where there is no uname at all /shell reads it as not macOS', async ($, on) => {

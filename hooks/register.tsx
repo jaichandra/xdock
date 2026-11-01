@@ -26,7 +26,7 @@ import {
 import type { LogLine, PartKind, RunStatus } from './run'
 import { detectMux, driver, echoes, HIDDEN_ALIVE, HIDDEN_ATTACH, HIDDEN_SOCKET, isTmuxPane, itermSessionId, readPane, screenText, selectArgv, TMUX_VERSION } from './mux'
 import type { Mux } from './mux'
-import { hasControls, ITERM_PATH, lineArgv, linuxArgv, linuxTerminals, NOT_MACOS, oneLine, osascriptArgv, osascriptFailure, pickApp } from './shell'
+import { hasControls, ITERM_PATH, lineArgv, linuxArgv, linuxTerminals, NOT_MACOS, oneLine, osascriptArgv, osascriptFailure, pickApp, shellTitle } from './shell'
 import type { TerminalApp } from './shell'
 
 const PANE = 'run'
@@ -287,14 +287,15 @@ const SCREEN_ROWS = 50
 
 // What the person types to look into the hidden terminals (and what /x says where no window can be opened).
 
-// Opens a window of a terminal emulator on Linux, when there is a screen to open it on: the first of $TERMINAL and the
-// usual ones that is installed. Nothing when none opens, and the line to type is the answer.
-async function linuxWindow($: EngineInterface, title: string): Promise<string | undefined> {
+// Opens a window of a terminal emulator on Linux, running `line`, when there is a screen to open it on: the first of
+// $TERMINAL and the usual ones that is installed. Its name, or nothing when none opens (the line to type is then the
+// answer). `failure` is what the window says if the line fails, so it can be read before the window goes.
+async function linuxWindow($: EngineInterface, line: string, title: string, failure: string): Promise<string | undefined> {
   const [display, wayland, wanted] = await Promise.all([envOf($.env.get('DISPLAY')), envOf($.env.get('WAYLAND_DISPLAY')), envOf($.env.get('TERMINAL'))])
   if (!display && !wayland) return undefined
   for (const bin of linuxTerminals(wanted)) {
-    const made = await $.process.run(linuxArgv(bin, HIDDEN_ATTACH, title), { timeoutMs: 15_000 }).catch(() => undefined)
-    if (made?.exitCode === 0) return `Attached to ${title} in ${bin}. Ctrl+B d leaves it.`
+    const made = await $.process.run(linuxArgv(bin, line, title, failure), { timeoutMs: 15_000 }).catch(() => undefined)
+    if (made?.exitCode === 0) return bin
   }
   return undefined
 }
@@ -312,7 +313,10 @@ async function attachPane($: EngineInterface, pane: string, title: string): Prom
     if (system?.stdout.trim() !== 'Darwin') {
       // Not macOS: in herdr or tmux, the attach line is typed into a pane split beside Claude Code (given the focus).
       const mux = await findMux($)
-      if (mux !== 'herdr' && mux !== 'tmux') return (await linuxWindow($, title)) ?? way
+      if (mux !== 'herdr' && mux !== 'tmux') {
+        const bin = await linuxWindow($, HIDDEN_ATTACH, title, 'Could not attach: is the xdock terminal still running?')
+        return bin ? `Attached to ${title} in ${bin}. Ctrl+B d leaves it.` : way
+      }
       const d = driver(mux)
       const cwd = await $.session.cwd()
       const made = await $.process.run(d.split({ target: undefined, direction: 'right', cwd, focus: true, home }), { cwd, timeoutMs: MUX_MS })
@@ -395,7 +399,10 @@ async function mirror($: EngineInterface, run: Run): Promise<string> {
     const line = `cd -- ${shellQuote(run.cwd)} && tail -n +1 -f -- ${shellQuote(run.spool.path)}`
     const way = `Type this in a terminal (Ctrl+C there ends the viewing, not the run): ${line}`
     const system = await $.process.run(['uname', '-s'], { timeoutMs: 3_000 }).catch(() => undefined)
-    if (system?.stdout.trim() !== 'Darwin') return way
+    if (system?.stdout.trim() !== 'Darwin') {
+      const bin = await linuxWindow($, line, `#${run.id} ${run.cmd}`.slice(0, 40), 'Could not follow the output: is its folder still there?')
+      return bin ? `Opened #${run.id}'s output in ${bin}: all of it so far, then live. It is a view: typing there does not reach the process.` : way
+    }
     const app = await terminalApp($)
     const made = await $.process.run(lineArgv(app, line, `#${run.id} ${run.cmd}`.slice(0, 40)), { timeoutMs: 15_000 })
     if (made.exitCode === 0) return `Opened #${run.id}'s output in ${app}: all of it so far, then live. It is a view: typing there does not reach the process.`
@@ -673,8 +680,12 @@ async function openShell($: EngineInterface): Promise<string> {
       return `Could not open a pane in ${mux}: ${oneLine(made.stderr || made.stdout) || `it exited with ${made.exitCode}`}`
     }
     const system = await $.process.run(['uname', '-s'], { timeoutMs: 3_000 }).catch(() => undefined)
-    if (system?.stdout.trim() !== 'Darwin') return NOT_MACOS
     const folder = await $.session.cwd()
+    if (system?.stdout.trim() !== 'Darwin') {
+      if (hasControls(folder)) return NOT_MACOS
+      const bin = await linuxWindow($, `cd -- ${shellQuote(folder)} && exec "\${SHELL:-sh}"`, shellTitle(folder), 'Could not open a shell in this folder.')
+      return bin ? `Opened a shell window in ${bin}: ${folder}` : NOT_MACOS
+    }
     if (hasControls(folder)) return "The folder's name has a control character in it, so /shell will not type it into a terminal: open one there yourself."
     const app = await terminalApp($)
     const made = await $.process.run(osascriptArgv(app, folder), { timeoutMs: 15_000 })

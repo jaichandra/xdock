@@ -1,3 +1,5 @@
+import { shellQuote } from './run'
+
 // The /shell command's logic with no engine in it: which terminal to open, the AppleScript that
 // opens it and the words the person gets back.
 
@@ -139,10 +141,10 @@ export function linuxTerminals(wanted: string | undefined): string[] {
   return [...own, ...Object.keys(LINUX_TERMINALS)]
 }
 
-/** The command that opens `bin` (a terminal emulator) on Linux with `line` typed to a shell in it, detached so the
+/** The command that opens `bin` (a terminal emulator) on Linux with `line` run by a shell in it, detached so the
  * call returns at once instead of when the window closes. Exits 127 when `bin` is not installed. The line is the
- * mod's own fixed text; when it fails the window stays, to say why. */
-export const linuxArgv = (bin: string, line: string, title: string): string[] => [
+ * mod's own fixed text; when it fails the window stays and says `failure`, so the reason can be read. */
+export const linuxArgv = (bin: string, line: string, title: string, failure: string): string[] => [
   'sh',
   '-c',
   'command -v "$1" >/dev/null 2>&1 || exit 127; nohup "$@" >/dev/null 2>&1 &',
@@ -151,7 +153,7 @@ export const linuxArgv = (bin: string, line: string, title: string): string[] =>
   ...(LINUX_TERMINALS[bin]?.(title) ?? ['-e']),
   'sh',
   '-c',
-  `${line} || { echo; echo "Could not attach: is the xdock terminal still running?"; read -r _; }`,
+  `${line} || { echo; echo ${shellQuote(failure)}; read -r _; }`,
 ]
 
 /** What an error or a stream said, as one short line. */
@@ -160,4 +162,4 @@ export const oneLine = (text: string, max = 200): string => {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line
 }
 
-export const NOT_MACOS = '/shell opens a pane in herdr or tmux, or a Terminal or iTerm window on macOS: open a terminal in this folder yourself.'
+export const NOT_MACOS = '/shell opens a pane in herdr or tmux, a Terminal or iTerm window on macOS, or a window of your terminal emulator on Linux with a screen: open a terminal in this folder yourself.'
