@@ -1,6 +1,6 @@
 {
   "name": "xdock",
-  "description": "A Run pane for Claude Code: run dev servers and other commands beside the chat",
+  "description": "xdock for Claude Code: run dev servers and other commands beside the chat",
   "owner": { "name": "jaichandra" },
   "plugins": [{ "name": "xdock", "source": "./" }]
 }

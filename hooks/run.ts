@@ -1,4 +1,4 @@
-// The Run pane's logic with no engine in it: what a command prints, which commands to suggest
+// xdock's logic with no engine in it: what a command prints, which commands to suggest
 // and which processes belong to a run.
 
 import { styleAfter } from './ansi'

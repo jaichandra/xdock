@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Renamed from run-pane to xdock, and `/rp` is now `/x`.** The plugin, marketplace (`jaichandra/xdock`), tool (`mcp__xdock__run_output`), config file (`hooks/xdock.json`), hidden tmux server (`tmux -L xdock`) and log files (`xdock-*.log`) carry the new name. `/rp` is gone.
+- **Renamed from run-pane to xdock, and `/rp` is now `/x`; the Run pane is now xdock.** The plugin, marketplace (`jaichandra/xdock`), tool (`mcp__xdock__run_output`), config file (`hooks/xdock.json`), hidden tmux server (`tmux -L xdock`) and log files (`xdock-*.log`) carry the new name. `/rp` is gone.
 - **Errors and warnings are found by what they say.** `Error: ...`, `TypeError: ...`, `error: ...`, `ERR_NAME_NOT_RESOLVED`, `npm ERR!`, `DeprecationWarning: ...`, `warning: ...` and `deprecated` were missed (a colon has no word boundary after it, and the match was case-sensitive). Stack frames (`at fn (file:1:2)`) are dim, `==>` lines are banners, and a leading `[tag]` is coloured apart from the line.
 - **`hooks/xdock.json` ships with `"forceColor": true`**, so tools that colour only for a terminal (webpack, npm, ...) colour in the pane.
 
