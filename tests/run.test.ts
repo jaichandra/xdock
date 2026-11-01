@@ -9,6 +9,7 @@ import {
   highlight,
   isAtBottom,
   isInteractive,
+  withColor,
   makeTargets,
   matchesAny,
   MAX_LINES,
@@ -285,4 +286,24 @@ test('the colour under the pointer is the button\'s 10% darker, never black', ()
     expect(BUTTON_HOVERS[tone]).toBe(darken(BUTTON_COLORS[tone], 0.1))
     expect(BUTTON_HOVERS[tone]).not.toBe(BUTTON_COLORS[tone])
   }
+})
+
+test('ls, grep and diff are asked to colour when the command is a plain one', () => {
+  expect(withColor('ls -al')).toBe('ls --color=always -al')
+  expect(withColor('grep -rn TODO src')).toBe('grep --color=always -rn TODO src')
+  expect(withColor('diff a b')).toBe('diff --color=always a b')
+  expect(withColor('ls')).toBe('ls --color=always')
+  // Said already, or read by another program, or not one of them: as typed.
+  expect(withColor('ls --color=never')).toBe('ls --color=never')
+  expect(withColor('ls -G')).toBe('ls -G')
+  expect(withColor('ls | wc -l')).toBe('ls | wc -l')
+  expect(withColor('ls > out.txt')).toBe('ls > out.txt')
+  expect(withColor('ls $(pwd)')).toBe('ls $(pwd)')
+  expect(withColor('cd x && ls')).toBe('cd x && ls')
+  expect(withColor('cat README.md')).toBe('cat README.md')
+  expect(withColor('lsof -i')).toBe('lsof -i')
+})
+
+test('claude command lines are coloured as commands', () => {
+  expect(highlight('claude plugin validate .')).toEqual([{ text: 'claude plugin validate .', kind: 'command' }])
 })

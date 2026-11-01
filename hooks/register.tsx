@@ -21,6 +21,7 @@ import {
   suggestionKind,
   statusWords,
   suggestions,
+  withColor,
   WRAPPER,
 } from './run'
 import type { LogLine, PartKind, RunStatus } from './run'
@@ -619,7 +620,7 @@ async function startRun($: EngineInterface, cmd: string): Promise<Run> {
     // Tools that colour only for a terminal are asked to anyway only when the person says so (`forceColor`): the
     // pane draws the colours it is given, but a command's own output is what other tools read.
     const stream = $.process.spawn({
-      argv: ['sh', '-c', WRAPPER, 'sh', cmd],
+      argv: ['sh', '-c', WRAPPER, 'sh', config.forceColor === true ? withColor(cmd) : cmd],
       cwd: run.cwd,
       ...(config.forceColor === true ? { env: { FORCE_COLOR: '1', CLICOLOR_FORCE: '1' } } : {}),
     })

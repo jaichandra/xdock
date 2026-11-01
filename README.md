@@ -9,6 +9,10 @@
   and let Claude read what they print.
 </p>
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="The xdock dock beside a Claude Code chat, showing the output of a command" width="800">
+</p>
+
 ## What you get
 
 - **A dock beside the chat.** Start a command, watch its output live while you keep chatting, and stop it cleanly when you are done.

@@ -315,7 +315,7 @@ export type Part = { text: string; kind: PartKind }
 const FRAME = '│┃║┌┐└┘╭╮╰╯─'
 const FRAMED = new RegExp(`^([\\s${FRAME}]*)(.*?)([\\s${FRAME}]*)$`)
 const URL = /https?:\/\/[^\s\u2502\u2503\u2551<>"']+/g
-const COMMAND = /^(docker|docker-compose|npm|npx|pnpm|yarn|make|cargo|git|kubectl|helm)\s/
+const COMMAND = /^(docker|docker-compose|npm|npx|pnpm|yarn|make|cargo|git|kubectl|helm|claude)\s/
 // Words that say a line is an error: the capitals of a log level, `Error:` and `TypeError:` and `error:` (a colon
 // ends them, and a colon has no word boundary after it), `ERR_NAME_NOT_RESOLVED` and `npm ERR!`.
 const ERROR = /\b(ERROR|FATAL|FAIL|FAILED|PANIC|failed|Failed)\b|\b\w*(Error|Exception):|\b(error|fatal):|\bERR_[A-Z_]+|\bERR!/
@@ -366,4 +366,18 @@ export function highlight(line: string): Part[] {
 /** Whether a scroll move leaves the window on the last rows (or the whole tree fits). */
 export function isAtBottom(move: { offset: number; bodyRows: number; contentRows: number }): boolean {
   return move.contentRows <= move.bodyRows || move.offset >= move.contentRows - move.bodyRows
+}
+
+const COLOR_FIRST = new Set(['ls', 'grep', 'egrep', 'fgrep', 'diff'])
+
+/** A command that colours only when told to, told to: `ls`, `grep` and `diff` take `--color=always` (a pipe is not a
+ * terminal, so they print plain text). Only a plain command is changed, with no pipe, list, redirect or substitution
+ * after which what it prints is read by another program, and not one that already says what it wants. */
+export function withColor(cmd: string): string {
+  if (/[|;&<>`$()\n\\]/.test(cmd)) return cmd
+  const match = /^(\s*)(ls|grep|egrep|fgrep|diff)(\s.*|)$/.exec(cmd)
+  if (!match || !COLOR_FIRST.has(match[2] as string)) return cmd
+  const rest = match[3] as string
+  if (/(^|\s)(--colou?r(=\S*)?|-G)(\s|$)/.test(rest)) return cmd
+  return `${match[1]}${match[2]} --color=always${rest}`
 }
