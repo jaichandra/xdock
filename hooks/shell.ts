@@ -121,6 +121,39 @@ export const lineArgv = (app: TerminalApp, line: string, title: string): string[
   title,
 ]
 
+/** Terminal emulators on Linux, in the order they are tried, and the words that make each run a command: the title,
+ * then what comes before the command (`-e` for most, `--` for gnome-terminal, `-x` for xfce4-terminal, nothing for kitty). */
+const LINUX_TERMINALS: Record<string, (title: string) => string[]> = {
+  'x-terminal-emulator': title => ['-T', title, '-e'],
+  'gnome-terminal': title => ['--title', title, '--'],
+  konsole: title => ['-p', `tabtitle=${title}`, '-e'],
+  'xfce4-terminal': title => ['--title', title, '-x'],
+  alacritty: title => ['--title', title, '-e'],
+  kitty: title => ['--title', title],
+  xterm: title => ['-T', title, '-e'],
+}
+
+/** The terminals to try for a window on Linux: `$TERMINAL` first when it is a plain program name, then the known ones. */
+export function linuxTerminals(wanted: string | undefined): string[] {
+  const own = wanted && /^[\w.+-]+$/.test(wanted) && !(wanted in LINUX_TERMINALS) ? [wanted] : []
+  return [...own, ...Object.keys(LINUX_TERMINALS)]
+}
+
+/** The command that opens `bin` (a terminal emulator) on Linux with `line` typed to a shell in it, detached so the
+ * call returns at once instead of when the window closes. Exits 127 when `bin` is not installed. The line is the
+ * mod's own fixed text; when it fails the window stays, to say why. */
+export const linuxArgv = (bin: string, line: string, title: string): string[] => [
+  'sh',
+  '-c',
+  'command -v "$1" >/dev/null 2>&1 || exit 127; nohup "$@" >/dev/null 2>&1 &',
+  'sh',
+  bin,
+  ...(LINUX_TERMINALS[bin]?.(title) ?? ['-e']),
+  'sh',
+  '-c',
+  `${line} || { echo; echo "Could not attach: is the xdock terminal still running?"; read -r _; }`,
+]
+
 /** What an error or a stream said, as one short line. */
 export const oneLine = (text: string, max = 200): string => {
   const line = text.replace(/\s+/g, ' ').trim()

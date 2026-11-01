@@ -40,6 +40,10 @@ type Machine = {
   /** Whether splitting fails. */
   isSplitBroken?: boolean
   settings?: string
+  /** What `uname -s` prints; Darwin when not said. */
+  system?: string
+  /** The terminal emulators installed (Linux): a window can be opened in these only. */
+  terminals?: string[]
 }
 
 const done = (stdout = '', exitCode = 0, stderr = '') => ({ value: { exitCode, stdout, stderr, isStdoutTruncated: false, isStderrTruncated: false } })
@@ -89,7 +93,9 @@ function engine(on: On, machine: Machine): void {
     // The hidden server is the same tmux on a socket of its own.
     const rest = bin === 'tmux' && all[0] === '-L' ? all.slice(2) : all
     if (bin === 'tmux' && rest[0] === '-V') return machine.hasTmux ? done('tmux 3.4\n') : done('', 127, 'tmux: not found')
-    if (bin === 'uname') return done('Darwin\n')
+    if (bin === 'uname') return done(`${machine.system ?? 'Darwin'}\n`)
+    // A window on Linux: detached, 127 where the emulator is not installed.
+    if (bin === 'sh' && rest[0] === '-c' && String(rest[1]).includes('command -v')) return machine.terminals?.includes(String(rest[3])) ? done() : done('', 127)
     if (bin === 'tmux' && rest[0] === 'has-session') return machine.isHiddenGone ? done('', 1, 'no server running') : done()
     // The hidden server's windows are made by a script that starts tmux itself.
     if (bin === 'sh' && rest[0] === '-c' && rest[1]?.includes('new-window')) return machine.isSplitBroken ? done('', 1, 'no server') : done(`%${++panes}\n`)
@@ -598,6 +604,62 @@ test('a running hidden run has an Attach button that opens a window on the hidde
   const window = machine.calls.find(argv => argv[0] === 'osascript')
   expect(window?.slice(3)).toEqual(['--', 'env -u TMUX tmux -L xdock attach -t xdock', 'run #1'])
   await ui.unmount()
+})
+
+const attachLinux = async ($: Parameters<Parameters<typeof test>[1]>[0], on: On, machine: Machine) => {
+  engine(on, machine)
+  await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
+  await gt($, 'vi notes.txt')
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'attach:1' })
+  await until(() => machine.toasts.length > 0)
+  await ui.unmount()
+}
+const launches = (machine: Machine) => machine.calls.filter(argv => argv[0] === 'sh' && String(argv[2]).includes('command -v'))
+
+test('on Linux with a screen, Attach opens a window of the first terminal that is installed', async ($, on) => {
+  const machine = machineOf({ hasTmux: true, system: 'Linux', env: { DISPLAY: ':0' }, terminals: ['gnome-terminal', 'xterm'], screen: cmd => ({ text: `${PROMPT} ${cmd}\n`, isBusy: true }) })
+  await attachLinux($, on, machine)
+
+  expect(machine.toasts[0]).toBe('Attached to run #1 in gnome-terminal. Ctrl+B d leaves it.')
+  // x-terminal-emulator is tried first and is not installed; the next is.
+  expect(launches(machine).map(argv => argv[4])).toEqual(['x-terminal-emulator', 'gnome-terminal'])
+  const window = launches(machine)[1]!
+  expect(window.slice(4, 8)).toEqual(['gnome-terminal', '--title', 'run #1', '--'])
+  expect(window.slice(8, 10)).toEqual(['sh', '-c'])
+  expect(window[10]).toMatch(/^env -u TMUX tmux -L xdock attach -t xdock \|\|/)
+  expect(machine.calls).toContainEqual(['tmux', '-L', 'xdock', 'select-window', '-t', '%1'])
+  expect(machine.calls.some(argv => argv[0] === 'osascript')).toBe(false)
+})
+
+test('on Linux $TERMINAL is tried first, when it is a plain program name', async ($, on) => {
+  const machine = machineOf({ hasTmux: true, system: 'Linux', env: { WAYLAND_DISPLAY: 'wayland-0', TERMINAL: 'foot' }, terminals: ['foot'], screen: cmd => ({ text: `${PROMPT} ${cmd}\n`, isBusy: true }) })
+  await attachLinux($, on, machine)
+
+  expect(machine.toasts[0]).toBe('Attached to run #1 in foot. Ctrl+B d leaves it.')
+  expect(launches(machine)[0]?.slice(4, 6)).toEqual(['foot', '-e'])
+})
+
+test('on Linux a $TERMINAL that is not a plain name is not run', async ($, on) => {
+  const machine = machineOf({ hasTmux: true, system: 'Linux', env: { DISPLAY: ':0', TERMINAL: 'xterm; rm -rf ~' }, terminals: [], screen: cmd => ({ text: `${PROMPT} ${cmd}\n`, isBusy: true }) })
+  await attachLinux($, on, machine)
+
+  expect(launches(machine).flatMap(argv => argv.slice(4))).not.toContain('xterm; rm -rf ~')
+})
+
+test('on Linux without a screen, or without a terminal installed, Attach gives the line to type', async ($, on) => {
+  const noScreen = machineOf({ hasTmux: true, system: 'Linux', terminals: ['xterm'], screen: cmd => ({ text: `${PROMPT} ${cmd}\n`, isBusy: true }) })
+  await attachLinux($, on, noScreen)
+  expect(noScreen.toasts[0]).toContain('Type this in a terminal to attach')
+  expect(noScreen.toasts[0]).toContain('env -u TMUX tmux -L xdock attach -t xdock')
+  expect(launches(noScreen)).toEqual([])
+})
+
+test('on Linux with a screen but no terminal installed, Attach gives the line to type', async ($, on) => {
+  const none = machineOf({ hasTmux: true, system: 'Linux', env: { DISPLAY: ':0' }, terminals: [], screen: cmd => ({ text: `${PROMPT} ${cmd}\n`, isBusy: true }) })
+  await attachLinux($, on, none)
+  expect(none.toasts[0]).toContain('Type this in a terminal to attach')
+  expect(launches(none).length).toBeGreaterThan(1)
 })
 
 test('where tmux is missing the command runs as a process of the mod', async ($, on) => {

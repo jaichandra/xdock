@@ -26,7 +26,7 @@ import {
 import type { LogLine, PartKind, RunStatus } from './run'
 import { detectMux, driver, echoes, HIDDEN_ALIVE, HIDDEN_ATTACH, HIDDEN_SOCKET, isTmuxPane, itermSessionId, readPane, screenText, selectArgv, TMUX_VERSION } from './mux'
 import type { Mux } from './mux'
-import { hasControls, ITERM_PATH, lineArgv, NOT_MACOS, oneLine, osascriptArgv, osascriptFailure, pickApp } from './shell'
+import { hasControls, ITERM_PATH, lineArgv, linuxArgv, linuxTerminals, NOT_MACOS, oneLine, osascriptArgv, osascriptFailure, pickApp } from './shell'
 import type { TerminalApp } from './shell'
 
 const PANE = 'run'
@@ -101,6 +101,9 @@ let isRedrawQueued = false
 // stay on its last row without being moved by a scroll.
 let back = 0
 let newest = 0
+// Whether the output of a run that has a terminal (an editor, a pager) stays on its first line: it does until the
+// person scrolls, so a screen is read from the top, not from the bottom that a log follows.
+let isPinnedTop = true
 
 async function pollWait($: EngineInterface): Promise<'poll'> {
   await $.clock.sleep(POLL_MS)
@@ -284,6 +287,18 @@ const SCREEN_ROWS = 50
 
 // What the person types to look into the hidden terminals (and what /x says where no window can be opened).
 
+// Opens a window of a terminal emulator on Linux, when there is a screen to open it on: the first of $TERMINAL and the
+// usual ones that is installed. Nothing when none opens, and the line to type is the answer.
+async function linuxWindow($: EngineInterface, title: string): Promise<string | undefined> {
+  const [display, wayland, wanted] = await Promise.all([envOf($.env.get('DISPLAY')), envOf($.env.get('WAYLAND_DISPLAY')), envOf($.env.get('TERMINAL'))])
+  if (!display && !wayland) return undefined
+  for (const bin of linuxTerminals(wanted)) {
+    const made = await $.process.run(linuxArgv(bin, HIDDEN_ATTACH, title), { timeoutMs: 15_000 }).catch(() => undefined)
+    if (made?.exitCode === 0) return `Attached to ${title} in ${bin}. Ctrl+B d leaves it.`
+  }
+  return undefined
+}
+
 // Opens a terminal window on the hidden tmux server, at a pane's window, so what is typed there reaches what runs in
 // it: an editor, a prompt. macOS only; elsewhere the line to type is the answer.
 async function attachPane($: EngineInterface, pane: string, title: string): Promise<string> {
@@ -294,7 +309,20 @@ async function attachPane($: EngineInterface, pane: string, title: string): Prom
     if (alive?.exitCode !== 0) return 'The hidden terminal has ended (its shells were exited, or the session that made it ended): run the command again.'
     await $.process.run(selectArgv(pane), { timeoutMs: MUX_MS }).catch(() => undefined)
     const system = await $.process.run(['uname', '-s'], { timeoutMs: 3_000 }).catch(() => undefined)
-    if (system?.stdout.trim() !== 'Darwin') return way
+    if (system?.stdout.trim() !== 'Darwin') {
+      // Not macOS: in herdr or tmux, the attach line is typed into a pane split beside Claude Code (given the focus).
+      const mux = await findMux($)
+      if (mux !== 'herdr' && mux !== 'tmux') return (await linuxWindow($, title)) ?? way
+      const d = driver(mux)
+      const cwd = await $.session.cwd()
+      const made = await $.process.run(d.split({ target: undefined, direction: 'right', cwd, focus: true, home }), { cwd, timeoutMs: MUX_MS })
+      const id = made.exitCode === 0 ? d.paneId(made.stdout) : undefined
+      if (!id) return way
+      opened.set(id, mux)
+      await waitForPrompt($, mux, id)
+      for (const argv of d.type(id, HIDDEN_ATTACH)) await $.process.run(argv, { timeoutMs: MUX_MS })
+      return `Attached to ${title} in a ${mux} pane. Ctrl+B d leaves it.`
+    }
     const app = await terminalApp($)
     const made = await $.process.run(lineArgv(app, HIDDEN_ATTACH, title), { timeoutMs: 15_000 })
     if (made.exitCode === 0) return `Attached to ${title} in ${app}. Ctrl+B d leaves it.`
@@ -553,6 +581,7 @@ async function startInPane($: EngineInterface, run: Run, mux: Mux, stopped: Prom
 
 async function startRun($: EngineInterface, cmd: string): Promise<Run> {
   back = 0
+  isPinnedTop = true
   const run: Run = { id: ++seq, cmd, cwd: await $.session.cwd(), status: 'running', code: null, log: new RunLog() }
   runs.push(run)
   const done = runs.filter(one => one.status !== 'running')
@@ -837,6 +866,7 @@ export const register: Register = on => {
   // pane's own window stays where it is.
   on('ui.scroll', { requestId: PANE }, ($, e) => {
     back = Math.min(Math.max(0, back - e.by), newest)
+    isPinnedTop = false
     $.ui.invalidate('ui.render')
     return {}
   }).catch((_$, e, next) => next(e))
@@ -901,7 +931,7 @@ export const register: Register = on => {
       1 + 1 + (e.props.placement === 'inline' ? 4 : 0) + 1 + (hints.length > 0 ? 1 : 0) + hintRows + Math.max(1, runs.length) + 3 + (e.props.bodyColumns < 80 ? 2 : 1)
     const visible = Math.max(1, rows - chrome)
     newest = Math.max(0, (picked?.log.size() ?? 0) - visible)
-    back = Math.min(back, newest)
+    back = isPinnedTop && picked?.isInteractive ? newest : Math.min(back, newest)
     // The lines ending `back` before the newest, newest first: drawn from the bottom up, so what
     // does not fit is cut at the top.
     const all = picked?.log.styled(MAX_LINES) ?? []
