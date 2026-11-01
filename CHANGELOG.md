@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.1
 
 - **The pane is called "the dock"** in the UI and the docs (xdock stays the name of the plugin), so sentences read "Opens the dock" and "The dock follows those runs", not "Opens xdock".
 
