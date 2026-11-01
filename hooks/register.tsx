@@ -1121,7 +1121,7 @@ export const register: Register = on => {
             <Text dimColor wrap="truncate-end">
               #{picked.id} output ({picked.log.size()} lines{back > 0 ? `, ${back} back` : ''})
             </Text>
-            {picked.mux === 'hidden' && picked.status === 'running' && <Text dimColor>Needs a terminal: press Attach (next to the run above) to type into it.</Text>}
+            {picked.mux === 'hidden' && picked.status === 'running' && <Text dimColor>Needs a terminal: press Attach (next to the run above) to type into it, or in another terminal type: {HIDDEN_ATTACH} (Ctrl+B d leaves it)</Text>}
             <Box flexDirection="column-reverse" flexGrow={1} flexShrink={1} overflow="hidden">
             {/* First, so at the bottom: it takes the room the lines leave, which keeps a short output at the top. */}
             <Box flexGrow={1} />

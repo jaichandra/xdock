@@ -835,6 +835,8 @@ test('a command that needs a terminal gets one, and the dock lists it with an At
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect(await ui.find({ key: 'attach:1' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Needs a terminal: press Attach/ })).toBeDefined()
+  // The line to type stays in the dock, for where no window can be opened.
+  expect(await ui.find({ type: 'Text', text: /env -u TMUX tmux -L xdock attach -t xdock/ })).toBeDefined()
   await ui.unmount()
 })
 
