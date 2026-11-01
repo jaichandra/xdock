@@ -94,11 +94,11 @@ test('suggestions put package scripts first, then cargo, then make, up to ten', 
 })
 
 test('the wrapper reports its pid before anything else', async () => {
-  expect(readPid('@@run-pane-pid 4242\nhello')).toEqual({ pid: 4242, rest: 'hello' })
+  expect(readPid('@@xdock-pid 4242\nhello')).toEqual({ pid: 4242, rest: 'hello' })
   expect(readPid('@@run-pa')).toBeUndefined()
-  expect(readPid('@@run-pane-pid 42')).toBeUndefined()
+  expect(readPid('@@xdock-pid 42')).toBeUndefined()
   expect(readPid('plain output')).toEqual({ rest: 'plain output' })
-  expect(readPid('@@run-pane-pid x\nrest')).toEqual({ rest: 'rest' })
+  expect(readPid('@@xdock-pid x\nrest')).toEqual({ rest: 'rest' })
 })
 
 test('every process below a pid is found, nothing else', async () => {
@@ -120,7 +120,7 @@ test('a run is marked and described by how it ended', async () => {
   expect(statusWords('failed', null)).toBe('could not start')
 })
 
-test('suggestions from run-pane.json come first and are not repeated', async () => {
+test('suggestions from xdock.json come first and are not repeated', async () => {
   expect(suggestions({ extra: ['docker compose up', 'npm run dev'], packageJson: '{"scripts":{"dev":"x","test":"y"}}' })).toEqual([
     'docker compose up',
     'npm run dev',
@@ -235,7 +235,7 @@ test('editors, pagers, monitors, sessions and REPLs need a terminal; builds, tes
   for (const cmd of ['npm test', 'ls -al', 'python script.py', 'node server.js', 'bash run.sh', 'git commit -m x', 'git commit --no-edit', 'git status', 'git log', 'docker run web', 'docker exec web ls', 'make dev', 'cat a | grep vi', 'echo vim', 'cargo run', 'psql -c "select 1"', 'ssh-keygen -t ed25519', 'vimeo-dl x', 'viewer x', 'sleep 1; echo done', '']) {
     expect(isInteractive(cmd), cmd).toBe(false)
   }
-  // What hooks/run-pane.json lists is told too, by first word.
+  // What hooks/xdock.json lists is told too, by first word.
   expect(isInteractive('mytui --x', ['mytui'])).toBe(true)
   expect(isInteractive('mytui --x')).toBe(false)
 })
@@ -267,7 +267,7 @@ test('the log can be dumped for a terminal: whole lines with a reset after each,
 })
 
 test('a word for a shell line is one word, whatever it holds', () => {
-  expect(shellQuote('/tmp/run-pane-x-1.log')).toBe("'/tmp/run-pane-x-1.log'")
+  expect(shellQuote('/tmp/xdock-x-1.log')).toBe("'/tmp/xdock-x-1.log'")
   expect(shellQuote("it's $(x) `y`")).toBe("'it'\\''s $(x) `y`'")
   expect(shellQuote('')).toBe("''")
 })

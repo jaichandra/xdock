@@ -4,7 +4,7 @@ import type { On } from 'claude-code'
 import { BUTTON_COLORS, BUTTON_HOVERS, BUTTON_INKS } from '../hooks/run'
 
 const PANE = {
-  plugin: 'run-pane',
+  plugin: 'xdock',
   component: 'Pane',
   requestId: 'run',
   props: {
@@ -20,9 +20,9 @@ const PANE = {
 const status: (string | undefined)[] = []
 const openedColumns: (number | undefined)[] = []
 
-// What the person's `/rp <command>` does; the answer's `text` is what the pane tells them.
+// What the person's `/x <command>` does; the answer's `text` is what the pane tells them.
 const gt = async ($: Parameters<Parameters<typeof test>[1]>[0], args: string) => ({
-  text: (await $.command.run({ command: 'rp', args })).text,
+  text: (await $.command.run({ command: 'x', args })).text,
 })
 
 // Stands for the engine beneath the mod: the calls the mod makes are answered here.
@@ -33,7 +33,7 @@ function engine(
 ) {
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('prompt.submit', (_, e) => ({ text: e.text }))
-  on('tool.register', () => ({ value: { tool: 'mcp__run-pane__run_output' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__xdock__run_output' } }))
   on('ui.open', (_, e) => {
     process.opened?.push(e.id)
     openedColumns.push(e.columns)
@@ -73,7 +73,7 @@ function engine(
   on('env.get', (_, e) => ({ value: e.name === 'HOME' ? '/Users/me' : undefined }))
   on('process.spawn', async function* (_, e) {
     process.spawns?.push({ argv: e.argv, env: e.env })
-    yield { stream: 'stderr' as const, text: '@@run-pane-pid 4242\n' }
+    yield { stream: 'stderr' as const, text: '@@xdock-pid 4242\n' }
     for (const line of process.lines) yield { stream: 'stdout' as const, text: line }
     if (process.later) {
       await process.later.gate
@@ -84,7 +84,7 @@ function engine(
   })
 }
 
-test('/rp starts a command and the pane lists it with its output and a Stop', async ($, on) => {
+test('/x starts a command and the pane lists it with its output and a Stop', async ($, on) => {
   const process = { calls: [] as string[][], lines: ['ready on :3000\n'] }
   engine(on, process)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
@@ -99,7 +99,7 @@ test('/rp starts a command and the pane lists it with its output and a Stop', as
   await ui.unmount()
 })
 
-test('/rp asks for a 60 column dock and says how to go fullscreen when the pane is inline', async ($, on) => {
+test('/x asks for a 60 column dock and says how to go fullscreen when the pane is inline', async ($, on) => {
   const process = { calls: [] as string[][], lines: [] }
   engine(on, process)
   openedColumns.length = 0
@@ -142,8 +142,8 @@ test('the status line keeps /shell while a command runs', async ($, on) => {
   status.length = 0
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
   await gt($, 'npm run dev')
-  expect(status.at(-1)).toBe('\u25b6 1 running \u00b7 /rp \u00b7 /shell')
-  expect(status[0]).toBe('\u25b6 /rp \u00b7 /shell')
+  expect(status.at(-1)).toBe('\u25b6 1 running \u00b7 /x \u00b7 /shell')
+  expect(status[0]).toBe('\u25b6 /x \u00b7 /shell')
 })
 
 test('the buttons are one row below the output', async ($, on) => {
@@ -194,17 +194,17 @@ test('the run_output tool returns the tail of a run for Claude', async ($, on) =
   await ui.find({ type: 'Text', text: /port 3000/ })
   await ui.unmount()
 
-  const none = await $.tool.call({ tool: 'mcp__run-pane__run_output', run: 'nothing like it' })
+  const none = await $.tool.call({ tool: 'mcp__xdock__run_output', run: 'nothing like it' })
   expect(String(none.result)).toContain('No run matches')
 
-  const got = await $.tool.call({ tool: 'mcp__run-pane__run_output', lines: 2 })
+  const got = await $.tool.call({ tool: 'mcp__xdock__run_output', lines: 2 })
   const text = String(got.result)
   expect(text).toContain('#1 npm run dev (running)')
   expect(text).toContain('Error: port 3000 in use')
   expect(text).not.toContain('one')
 })
 
-test('the pane closes from /rp close and from its Close button, and the runs go on', async ($, on) => {
+test('the pane closes from /x close and from its Close button, and the runs go on', async ($, on) => {
   const process = { calls: [] as string[][], lines: ['ready\n'] }
   engine(on, process)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
@@ -221,11 +221,11 @@ test('the pane closes from /rp close and from its Close button, and the runs go 
   await ui.unmount()
 })
 
-test('suggestions from run-pane.json come first', async ($, on) => {
+test('suggestions from xdock.json come first', async ($, on) => {
   const process = { calls: [] as string[][], lines: [] }
   engine(on, process, {
     'package.json': '{"scripts":{"dev":"vite"}}',
-    'run-pane.json': '{"suggestions":["docker compose up","make seed"]}',
+    'xdock.json': '{"suggestions":["docker compose up","make seed"]}',
   })
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
   await gt($, '')
@@ -237,18 +237,18 @@ test('suggestions from run-pane.json come first', async ($, on) => {
   await ui.unmount()
 })
 
-test('the pane opens by itself in a folder run-pane.json names', async ($, on) => {
+test('the pane opens by itself in a folder xdock.json names', async ($, on) => {
   const process = { calls: [] as string[][], lines: [], remote: 'ssh://git@host/team/Acme-Shop.git\n', opened: [] as string[] }
-  engine(on, process, { 'run-pane.json': '{"openFor":["acme"]}' })
+  engine(on, process, { 'xdock.json': '{"openFor":["acme"]}' })
   await $.session.start({ cwd: '/w/sample-app.worktrees/PROJ-1', surface: 'terminal', isInteractive: true })
   // Drawing the pane gives the start-up work the time to settle.
   await (await $.ui.mount({ ...PANE, surface: 'terminal' })).unmount()
   expect(process.opened).toEqual(['run'])
 })
 
-test('the pane stays closed in a folder run-pane.json does not name', async ($, on) => {
+test('the pane stays closed in a folder xdock.json does not name', async ($, on) => {
   const other = { calls: [] as string[][], lines: [], remote: 'ssh://git@host/team/other-service.git\n', opened: [] as string[] }
-  engine(on, other, { 'run-pane.json': '{"openFor":["acme"]}' })
+  engine(on, other, { 'xdock.json': '{"openFor":["acme"]}' })
   await $.session.start({ cwd: '/w/other-service', surface: 'terminal', isInteractive: true })
   // Drawing the pane gives the start-up work the time to settle.
   await (await $.ui.mount({ ...PANE, surface: 'terminal' })).unmount()
@@ -277,11 +277,11 @@ test('the output is coloured: a URL underlined, notes dim, a banner green', asyn
 
 const PACKAGE = '{"scripts":{"dev":"vite"}}'
 
-// A mod installed on its own has no run-pane.json; one that is broken counts for the same.
+// A mod installed on its own has no xdock.json; one that is broken counts for the same.
 for (const [name, files] of [
-  ['there is no run-pane.json', { 'package.json': PACKAGE }],
-  ['run-pane.json is not JSON', { 'package.json': PACKAGE, 'run-pane.json': 'not json {' }],
-  ['run-pane.json is not an object', { 'package.json': PACKAGE, 'run-pane.json': '[1, 2]' }],
+  ['there is no xdock.json', { 'package.json': PACKAGE }],
+  ['xdock.json is not JSON', { 'package.json': PACKAGE, 'xdock.json': 'not json {' }],
+  ['xdock.json is not an object', { 'package.json': PACKAGE, 'xdock.json': '[1, 2]' }],
 ] as const) {
   test(`the defaults hold when ${name}`, async ($, on) => {
     const process = { calls: [] as string[][], lines: [], remote: 'ssh://git@host/team/Acme-Shop.git\n', opened: [] as string[] }
@@ -301,7 +301,7 @@ const ESC = '\u001b'
 // Output arrives in pieces after the run starts: wait until the tool has all of what it printed.
 async function untilPrinted($: Parameters<Parameters<typeof test>[1]>[0], text: string): Promise<void> {
   for (let tick = 0; tick < 400; tick++) {
-    if (String((await $.tool.call({ tool: 'mcp__run-pane__run_output' })).result).includes(text)) return
+    if (String((await $.tool.call({ tool: 'mcp__xdock__run_output' })).result).includes(text)) return
     await new Promise<void>(resolve => setTimeout(resolve, 5))
   }
 }
@@ -347,7 +347,7 @@ test('a command is a process of the mod, run as it is (no colour forced), and th
   await ui.unmount()
 
   // What Claude reads has no escape sequences in it.
-  const got = String((await $.tool.call({ tool: 'mcp__run-pane__run_output' })).result)
+  const got = String((await $.tool.call({ tool: 'mcp__xdock__run_output' })).result)
   expect(got).toContain('failed and ok, hot blue')
   expect(got).not.toContain(ESC)
 })
@@ -422,7 +422,7 @@ test('a command that needs a terminal where there is none runs without one and s
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
   await gt($, 'vi notes.txt')
 
-  const got = String((await $.tool.call({ tool: 'mcp__run-pane__run_output' })).result)
+  const got = String((await $.tool.call({ tool: 'mcp__xdock__run_output' })).result)
   expect(got).toContain('no terminal to give it here')
 })
 
@@ -472,7 +472,7 @@ test('the suggestions are rectangles in one wrapping row after a dim Try, with n
   expect(await ui.find({ key: 'hint:npm run dev' })).toBeDefined()
   await ui.press({ key: 'hint:npm run test' })
   await new Promise<void>(resolve => setTimeout(resolve, 30))
-  const got = String((await $.tool.call({ tool: 'mcp__run-pane__run_output' })).result)
+  const got = String((await $.tool.call({ tool: 'mcp__xdock__run_output' })).result)
   expect(got).toContain('npm run test')
   await ui.unmount()
 })
@@ -493,7 +493,7 @@ test('Open in shell on a process of the plugin opens a window with all its outpu
   expect(made?.argv[2]).toContain('umask 077')
   expect(made?.stdin).toBe('one\u001b[0m\n\u001b[32mtwo\u001b[0m\u001b[0m\npartial')
   const path = made?.argv[4] ?? ''
-  expect(path).toMatch(/^\/tmp\/run-pane-[a-z0-9]+-1\.log$/)
+  expect(path).toMatch(/^\/tmp\/xdock-[a-z0-9]+-1\.log$/)
   // The window tails it from its first line: all so far, then live. The path is quoted, never part of a script.
   const window = process.calls.find(argv => argv[0] === 'osascript')
   expect(window?.slice(3)).toEqual(['--', `cd -- '/w/sample-app' && tail -n +1 -f -- '${path}'`, '#1 npm run dev'])
@@ -586,9 +586,9 @@ test('a pane that has a lot of output draws it, whatever the lines say', async (
   await ui.unmount()
 })
 
-test('"forceColor" in run-pane.json asks the commands to colour their output', async ($, on) => {
+test('"forceColor" in xdock.json asks the commands to colour their output', async ($, on) => {
   const process = { calls: [] as string[][], spawns: [] as { argv: readonly string[]; env?: Record<string, string> | undefined }[], lines: ['ready\n'] }
-  engine(on, process, { 'run-pane.json': '{"forceColor":true}', 'package.json': '{}' })
+  engine(on, process, { 'xdock.json': '{"forceColor":true}', 'package.json': '{}' })
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
   await gt($, 'npm test')
 

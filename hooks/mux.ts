@@ -1,4 +1,4 @@
-// The multiplexer side of /rp and /shell with no engine in it: which multiplexer the session runs
+// The multiplexer side of /x and /shell with no engine in it: which multiplexer the session runs
 // in, the commands that split a pane, type into it, read it back and close it, and how what a pane
 // shows is told from the command that was typed into it.
 
@@ -107,8 +107,8 @@ const herdr: MuxDriver = {
 }
 
 /** The socket of the hidden tmux server and the name of its one session: every run is a window of it. */
-export const HIDDEN_SOCKET = 'run-pane'
-const HIDDEN_SESSION = 'run-pane'
+export const HIDDEN_SOCKET = 'xdock'
+const HIDDEN_SESSION = 'xdock'
 
 /** What tells whether tmux is installed. */
 export const TMUX_VERSION = ['tmux', '-V']
@@ -134,7 +134,7 @@ const visibleSplit: MuxDriver['split'] = ({ target, direction, cwd, focus }) => 
 ]
 
 // What the keeper window says: it is not a run's, and it is why the server outlives the shells in the other windows.
-const KEEPER = 'echo "run-pane: no command runs here. This window keeps the hidden terminal open; Ctrl+B d leaves it."; exec sleep 2147483647'
+const KEEPER = 'echo "xdock: no command runs here. This window keeps the hidden terminal open; Ctrl+B d leaves it."; exec sleep 2147483647'
 
 // A window of the hidden session. The session starts with a keeper window that does nothing, so the server does not
 // end when the person exits the shell of the last run (tmux ends a session with its last window): the next run

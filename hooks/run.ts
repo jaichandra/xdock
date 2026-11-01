@@ -7,7 +7,7 @@ import type { Style } from './ansi'
 export const MAX_LINES = 2000
 export const MAX_SUGGESTIONS = 10
 /** What the wrapper prints first, so the mod knows the shell's pid to stop the whole tree by. */
-export const PID_MARKER = '@@run-pane-pid '
+export const PID_MARKER = '@@xdock-pid '
 
 /** Runs `$1` in a login shell, after saying which process that is. `exec` keeps the pid. */
 export const WRAPPER = `printf '${PID_MARKER}%s\\n' "$$" >&2; exec sh -lc "$1"`
@@ -151,7 +151,7 @@ const REPLS = new Set(['sh', 'bash', 'zsh', 'fish', 'python', 'python3', 'node',
 const WRAPPERS = new Set(['sudo', 'env', 'time', 'nice', 'nohup', 'command', 'exec', 'builtin', 'xargs', 'doas', 'caffeinate'])
 
 /** Whether a command needs a terminal of its own: an editor, a pager, a monitor, a shell, a REPL, a container
- * entered with `-it`, an editor `git` opens. `extra` is what `interactive` in hooks/run-pane.json adds (first words). */
+ * entered with `-it`, an editor `git` opens. `extra` is what `interactive` in hooks/xdock.json adds (first words). */
 export function isInteractive(cmd: string, extra: readonly string[] = []): boolean {
   // Each command of a list or a pipeline: `git log | less`, `cd app && vim x`.
   for (const segment of cmd.split(/&&|\|\||[;|&\n]/)) {
@@ -250,7 +250,7 @@ export function groupSuggestions(cmds: readonly string[]): { prefix: string; ite
 export type ProjectFiles = { packageJson?: string; makefile?: string; hasCargo?: boolean; extra?: readonly string[] }
 
 export function suggestions(files: ProjectFiles): string[] {
-  // What hooks/run-pane.json lists comes first: it is what whoever set the mod up wants suggested most.
+  // What hooks/xdock.json lists comes first: it is what whoever set the mod up wants suggested most.
   const all = [
     ...(files.extra ?? []),
     ...(files.packageJson === undefined ? [] : packageScripts(files.packageJson)),

@@ -3,7 +3,7 @@ export type RunId = number
 
 declare module 'claude-code' {
   interface PluginState {
-    'run-pane': {
+    'xdock': {
       /** Bumped whenever a run's status or output changes, so the pane redraws. */
       rev: Shaped<number>
       /** What the pane's command field holds. */

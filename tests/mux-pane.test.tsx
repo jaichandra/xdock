@@ -6,14 +6,14 @@ import { BUTTON_COLORS, BUTTON_INKS } from '../hooks/run'
 // Nothing here starts herdr or tmux: `process.run` is answered by the stub below, which keeps a pane's
 // screen the way the multiplexer would show it, and records what it was asked to run.
 const PANE = {
-  plugin: 'run-pane',
+  plugin: 'xdock',
   component: 'Pane',
   requestId: 'run',
   props: { title: 'Run', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} },
 } as const
 
 const gt = async ($: Parameters<Parameters<typeof test>[1]>[0], args: string) => ({
-  text: (await $.command.run({ command: 'rp', args })).text,
+  text: (await $.command.run({ command: 'x', args })).text,
 })
 
 type Machine = {
@@ -52,7 +52,7 @@ function engine(on: On, machine: Machine): void {
   const interrupted = new Set<string>()
   let panes = 0
   on('command.register', (_, e) => ({ value: { command: e.name } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__run-pane__run_output' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__xdock__run_output' } }))
   on('ui.open', (_, e) => {
     machine.opened?.push(e.id)
     return { value: { isPlaced: true } }
@@ -74,12 +74,12 @@ function engine(on: On, machine: Machine): void {
   on('fs.exists', () => ({ value: false }))
   on('env.get', (_, e) => ({ value: machine.env[e.name] }))
   on('fs.read', (_, e) => {
-    if (machine.settings !== undefined && e.path.endsWith('run-pane.json')) return { value: machine.settings }
+    if (machine.settings !== undefined && e.path.endsWith('xdock.json')) return { value: machine.settings }
     throw new Error('missing')
   })
   on('process.spawn', async function* (_, e) {
     machine.spawned.push([...e.argv])
-    yield { stream: 'stderr' as const, text: '@@run-pane-pid 4242\n' }
+    yield { stream: 'stderr' as const, text: '@@xdock-pid 4242\n' }
     await new Promise<void>(() => undefined)
   })
   on('process.run', (_, e) => {
@@ -199,10 +199,10 @@ async function until(isMet: () => boolean): Promise<void> {
 }
 
 // A run reads over once the tool says so: the poll that ends it runs on a clock of its own, so a test that
-// looks at the pane right after /rp would race it.
+// looks at the pane right after /x would race it.
 async function untilOver($: Parameters<Parameters<typeof test>[1]>[0]): Promise<void> {
   for (let tick = 0; tick < 500; tick++) {
-    const got = await $.tool.call({ tool: 'mcp__run-pane__run_output' })
+    const got = await $.tool.call({ tool: 'mcp__xdock__run_output' })
     if (/\((done|stopped|exit|killed)/.test(String(got.result))) return
     await new Promise<void>(resolve => setTimeout(resolve, 5))
   }
@@ -221,7 +221,7 @@ const PROMPT = 'me@h:~/app$'
 const finishing = () => (cmd: string, reads: number) =>
   reads < 2 ? { text: `${PROMPT} ${cmd}\nbuilding\n`, isBusy: true } : { text: `${PROMPT} ${cmd}\nbuilding\ndone\n${PROMPT} `, isBusy: false }
 
-test('in herdr /rp splits a pane on the right, types the command as it is and starts no process of its own', async ($, on) => {
+test('in herdr /x splits a pane on the right, types the command as it is and starts no process of its own', async ($, on) => {
   const machine = machineOf({ env: HERDR, screen: finishing() })
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
@@ -263,7 +263,7 @@ test('the run reads its output without the command line above it or the prompt b
   await ui.find({ key: 'restart:1' })
   await ui.unmount()
 
-  const got = await $.tool.call({ tool: 'mcp__run-pane__run_output' })
+  const got = await $.tool.call({ tool: 'mcp__xdock__run_output' })
   expect(String(got.result)).toBe('#1 npm test (done), last 2 of 2 lines:\nbuilding\ndone')
 })
 
@@ -384,7 +384,7 @@ test('a command of several lines is not typed into a pane, where it would run li
   expect(machine.calls.some(argv => argv[2] === 'split')).toBe(false)
 })
 
-test('"multiplexer": false in run-pane.json keeps the commands out of the panes', async ($, on) => {
+test('"multiplexer": false in xdock.json keeps the commands out of the panes', async ($, on) => {
   const machine = machineOf({ env: HERDR, settings: '{"multiplexer":false}' })
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
@@ -423,7 +423,7 @@ test('/shell in tmux, and when the split fails it says why in one line', async (
   expect(said.text).toBe('Could not open a pane in tmux: no such session')
 })
 
-test('/rp alone opens the Run pane in a multiplexer too', async ($, on) => {
+test('/x alone opens the Run pane in a multiplexer too', async ($, on) => {
   const machine = machineOf({ env: HERDR, opened: [] })
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
@@ -576,8 +576,8 @@ test('without a multiplexer of the person\'s, a command runs in a window of a hi
   await untilOver($)
   const split = machine.calls.find(argv => argv[0] === 'sh' && argv[2]?.includes('new-window'))
   expect(split?.slice(3)).toEqual(['sh', '/w/sample-app'])
-  expect(split?.[2]).toContain('tmux -L run-pane')
-  expect(machine.calls.find(argv => argv[1] === '-L' && argv.includes('-l'))).toEqual(['tmux', '-L', 'run-pane', 'send-keys', '-t', '%1', '-l', '--', 'vi notes.txt'])
+  expect(split?.[2]).toContain('tmux -L xdock')
+  expect(machine.calls.find(argv => argv[1] === '-L' && argv.includes('-l'))).toEqual(['tmux', '-L', 'xdock', 'send-keys', '-t', '%1', '-l', '--', 'vi notes.txt'])
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect(await ui.find({ key: 'restart:1' })).toBeDefined()
@@ -594,9 +594,9 @@ test('a running hidden run has an Attach button that opens a window on the hidde
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await ui.press({ key: 'attach:1' })
   await until(() => machine.calls.some(argv => argv[0] === 'osascript'))
-  expect(machine.calls).toContainEqual(['tmux', '-L', 'run-pane', 'select-window', '-t', '%1'])
+  expect(machine.calls).toContainEqual(['tmux', '-L', 'xdock', 'select-window', '-t', '%1'])
   const window = machine.calls.find(argv => argv[0] === 'osascript')
-  expect(window?.slice(3)).toEqual(['--', 'env -u TMUX tmux -L run-pane attach -t run-pane', 'run #1'])
+  expect(window?.slice(3)).toEqual(['--', 'env -u TMUX tmux -L xdock attach -t xdock', 'run #1'])
   await ui.unmount()
 })
 
@@ -631,7 +631,7 @@ test('leaving the session ends the hidden server; a /clear leaves it', async ($,
   await $.session.end(ending('clear'))
   expect(machine.calls.some(argv => argv.includes('kill-server'))).toBe(false)
   await $.session.end(ending('prompt_input_exit'))
-  expect(machine.calls).toContainEqual(['tmux', '-L', 'run-pane', 'kill-server'])
+  expect(machine.calls).toContainEqual(['tmux', '-L', 'xdock', 'kill-server'])
 })
 
 test('/shell does not use the hidden server: nobody would see that pane', async ($, on) => {
@@ -656,7 +656,7 @@ test('a pane just made is looked at until its shell has settled before the comma
   expect(machine.calls.slice(0, typedAt).filter(argv => argv.includes('capture-pane')).length).toBeGreaterThan(2)
 })
 
-test('in iTerm2 /rp splits a pane on the right of the pane Claude Code runs in and types the command there', async ($, on) => {
+test('in iTerm2 /x splits a pane on the right of the pane Claude Code runs in and types the command there', async ($, on) => {
   const machine = machineOf({ env: ITERM, screen: finishing() })
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
@@ -789,7 +789,7 @@ test('in herdr a command that needs a terminal is typed into a pane beside Claud
   await ui.unmount()
 })
 
-test('"interactive" in run-pane.json adds commands that get a terminal', async ($, on) => {
+test('"interactive" in xdock.json adds commands that get a terminal', async ($, on) => {
   const machine = machineOf({ hasTmux: true, settings: '{"interactive":["mytui"]}', screen: finishing() })
   engine(on, machine)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
@@ -815,7 +815,7 @@ test('what a full-screen program shows is the run output while it holds the scre
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
   await gt($, 'vi notes.txt')
 
-  const read = async () => String((await $.tool.call({ tool: 'mcp__run-pane__run_output' })).result)
+  const read = async () => String((await $.tool.call({ tool: 'mcp__xdock__run_output' })).result)
   for (let tick = 0; tick < 400 && !(await read()).includes('-- INSERT --'); tick++) await new Promise<void>(resolve => setTimeout(resolve, 5))
   expect(await read()).toContain('-- INSERT --')
   expect(await read()).toContain('(running)')
@@ -834,7 +834,7 @@ test('Open in shell on a run in a hidden terminal is the Attach, and in a pane b
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await ui.press({ key: 'shell' })
   await until(() => hidden.calls.some(argv => argv[0] === 'osascript'))
-  expect(hidden.calls.find(argv => argv[0] === 'osascript')?.slice(3)).toEqual(['--', 'env -u TMUX tmux -L run-pane attach -t run-pane', 'run #1'])
+  expect(hidden.calls.find(argv => argv[0] === 'osascript')?.slice(3)).toEqual(['--', 'env -u TMUX tmux -L xdock attach -t xdock', 'run #1'])
   // No second window made for it.
   expect(hidden.calls.filter(argv => argv[0] === 'sh' && argv[2]?.includes('new-window'))).toHaveLength(1)
   await ui.unmount()

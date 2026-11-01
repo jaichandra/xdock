@@ -30,7 +30,7 @@ import { hasControls, ITERM_PATH, lineArgv, NOT_MACOS, oneLine, osascriptArgv, o
 import type { TerminalApp } from './shell'
 
 const PANE = 'run'
-const TOOL = 'mcp__run-pane__run_output'
+const TOOL = 'mcp__xdock__run_output'
 const REDRAW_MS = 120
 const KEEP_RUNS = 12
 const POLL_MS = 500
@@ -39,9 +39,9 @@ const POLL_MS = 500
 const INTERRUPT_POLLS = 60
 const TERM_POLLS = 20
 
-const rev = atom({ plugin: 'run-pane', key: 'rev' } as const, 0, { shape: 'rev-1' })
-const draft = atom({ plugin: 'run-pane', key: 'draft' } as const, '', { shape: 'draft-1' })
-const selected = atom({ plugin: 'run-pane', key: 'selected' } as const, 0, { shape: 'selected-1' })
+const rev = atom({ plugin: 'xdock', key: 'rev' } as const, 0, { shape: 'rev-1' })
+const draft = atom({ plugin: 'xdock', key: 'draft' } as const, '', { shape: 'draft-1' })
+const selected = atom({ plugin: 'xdock', key: 'selected' } as const, 0, { shape: 'selected-1' })
 
 type Run = {
   id: number
@@ -118,10 +118,10 @@ function redraw($: EngineInterface): void {
 
 function showStatus($: EngineInterface): void {
   const running = runs.filter(run => run.status === 'running').length
-  $.ui.status(running > 0 ? `▶ ${running} running · /rp · /shell` : '▶ /rp · /shell')
+  $.ui.status(running > 0 ? `▶ ${running} running · /x · /shell` : '▶ /x · /shell')
 }
 
-// hooks/run-pane.json is optional and meant for whoever bundles the mod: `suggestions` (commands to
+// hooks/xdock.json is optional and meant for whoever bundles the mod: `suggestions` (commands to
 // suggest first), `openFor` (words that make the pane open by itself) and `multiplexer` (false keeps
 // the commands out of herdr and tmux panes). Without it, the defaults.
 //
@@ -137,7 +137,7 @@ const wordsOf = (value: unknown): string[] => (Array.isArray(value) ? value.filt
 
 async function settings($: EngineInterface): Promise<Settings> {
   try {
-    const parsed: unknown = JSON.parse(await $.fs.read(`${$.plugin.root}/hooks/run-pane.json`))
+    const parsed: unknown = JSON.parse(await $.fs.read(`${$.plugin.root}/hooks/xdock.json`))
     return typeof parsed === 'object' && parsed !== null ? (parsed as Settings) : {}
   } catch {
     return {}
@@ -145,7 +145,7 @@ async function settings($: EngineInterface): Promise<Settings> {
 }
 
 // The pane opens by itself, without taking the keyboard, in a folder whose git remote or path
-// names one of the `openFor` words (hooks/run-pane.json); anywhere else it waits for `/rp`. A linked
+// names one of the `openFor` words (hooks/xdock.json); anywhere else it waits for `/x`. A linked
 // worktree shares its repository's remote, so it counts too.
 async function openIfWanted($: EngineInterface): Promise<void> {
   const { openFor } = await settings($)
@@ -219,7 +219,7 @@ function finish($: EngineInterface, run: Run, status: RunStatus, code: number | 
   run.status = run.isStopping && (status === 'exited' || status === 'done') ? 'stopped' : status
   run.code = code
   run.release = undefined
-  spoolTo($, run, `\n[run-pane] #${run.id} ${statusWords(run.status, run.code)}\n`)
+  spoolTo($, run, `\n[xdock] #${run.id} ${statusWords(run.status, run.code)}\n`)
   showStatus($)
   redraw($)
 }
@@ -270,7 +270,7 @@ const GONE_POLLS = 3
 // The rows of a full-screen program the pane keeps.
 const SCREEN_ROWS = 50
 
-// What the person types to look into the hidden terminals (and what /rp says where no window can be opened).
+// What the person types to look into the hidden terminals (and what /x says where no window can be opened).
 
 // Opens a terminal window on the hidden tmux server, at a pane's window, so what is typed there reaches what runs in
 // it: an editor, a prompt. macOS only; elsewhere the line to type is the answer.
@@ -331,7 +331,7 @@ async function mirror($: EngineInterface, run: Run): Promise<string> {
   try {
     if (!run.spool) {
       const tmp = ((await envOf($.env.get('TMPDIR'))) ?? '/tmp').replace(/\/$/, '')
-      const spool = { path: `${tmp}/run-pane-${Date.now().toString(36)}-${run.id}.log`, buffer: '', isFlushing: true }
+      const spool = { path: `${tmp}/xdock-${Date.now().toString(36)}-${run.id}.log`, buffer: '', isFlushing: true }
       // Set and read together: what the run prints from now on goes to the buffer, and what it printed is the dump.
       run.spool = spool
       const dump = run.log.dump()
@@ -341,7 +341,7 @@ async function mirror($: EngineInterface, run: Run): Promise<string> {
         return `Could not copy the output for a terminal: ${oneLine(made.stderr || made.stdout) || `exit ${made.exitCode}`}`
       }
       await flushSpool($, spool)
-      if (run.status !== 'running') spoolTo($, run, `\n[run-pane] #${run.id} ${statusWords(run.status, run.code)}\n`)
+      if (run.status !== 'running') spoolTo($, run, `\n[xdock] #${run.id} ${statusWords(run.status, run.code)}\n`)
     }
     // The window starts in the folder the command ran in, so what is typed there next is in the same place.
     if (hasControls(run.cwd)) return "The run's folder has a control character in its name, so it is not typed into a terminal: open one there yourself."
@@ -645,12 +645,12 @@ const DOCK_COLUMNS = 60
 const DOCS_URL = 'https://code.claude.com/docs/en/fullscreen'
 const DOCK_HINT = `Limited view: the buttons need Claude Code's flicker-free display mode. Run /tui fullscreen (it saves the choice), or start with CLAUDE_CODE_NO_FLICKER=1 claude. Details: ${DOCS_URL}`
 
-// What `/rp` does: open the pane, and start the command if there is one.
+// What `/x` does: open the pane, and start the command if there is one.
 async function runPrompt($: EngineInterface, args: string, isFullscreen: boolean): Promise<string> {
   const cmd = args.trim()
   if (cmd === 'close') {
     await $.ui.close({ id: PANE })
-    return 'Run pane closed. Commands keep running; /rp shows them again.'
+    return 'Run pane closed. Commands keep running; /x shows them again.'
   }
   // The Run pane shows every run: a process of this mod draws its output there, and one in a terminal pane is followed.
   const run = cmd === '' ? undefined : await start($, cmd)
@@ -765,8 +765,8 @@ export const register: Register = on => {
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
-      name: 'rp',
-      description: 'Run a command in the Run pane; with none, open the pane (/rp close closes it)',
+      name: 'x',
+      description: 'Run a command in the Run pane; with none, open the pane (/x close closes it)',
       argumentHint: '[command | close]',
       immediate: true,
     })
@@ -792,8 +792,8 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // `/rp npm run dev` runs a command in the pane, `/rp` opens it, `/rp close` closes it.
-  on('command.run', { command: 'rp' }, async ($, e) => ({ text: await runPrompt($, e.args, e.presentation?.isFullscreen === true) }))
+  // `/x npm run dev` runs a command in the pane, `/x` opens it, `/x close` closes it.
+  on('command.run', { command: 'x' }, async ($, e) => ({ text: await runPrompt($, e.args, e.presentation?.isFullscreen === true) }))
 
   on('command.run', { command: 'shell' }, async $ => ({ text: await openShell($) }))
 

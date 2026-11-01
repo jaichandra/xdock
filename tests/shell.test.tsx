@@ -23,7 +23,7 @@ const typed = (command: string, args: string) =>
   ({ command, args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } }) as const
 
 const PANE = {
-  plugin: 'run-pane',
+  plugin: 'xdock',
   component: 'Pane',
   requestId: 'run',
   props: { title: 'Run', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} },
@@ -37,7 +37,7 @@ function engine(on: On, machine: Machine = {}): Seen {
   const { system = 'Darwin', isItermInstalled = false, osascript = { exitCode: 0 }, cwd = '/w/sample-app', termProgram } = machine
   const seen: Seen = { calls: [], exists: [], toasts: [], cwd }
   on('command.register', () => ({ value: { command: 'shell' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__run-pane__run_output' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__xdock__run_output' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.close', () => ({ value: undefined }))
   on('ui.status', () => ({ value: undefined }))

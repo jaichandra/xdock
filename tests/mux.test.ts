@@ -104,13 +104,13 @@ test('a shell is idle when it leads its terminal: herdr by its process info, tmu
 test('the hidden tmux server is the same driver on a socket of its own, with the folder and the pane as arguments', () => {
   const hidden = driver('hidden')
   expect(hidden.type('%2', '-x')).toEqual([
-    ['tmux', '-L', 'run-pane', 'send-keys', '-t', '%2', '-l', '--', '-x'],
-    ['tmux', '-L', 'run-pane', 'send-keys', '-t', '%2', 'Enter'],
+    ['tmux', '-L', 'xdock', 'send-keys', '-t', '%2', '-l', '--', '-x'],
+    ['tmux', '-L', 'xdock', 'send-keys', '-t', '%2', 'Enter'],
   ])
-  expect(hidden.read('%2', 50)).toEqual(['tmux', '-L', 'run-pane', 'capture-pane', '-p', '-J', '-t', '%2', '-S', '-50'])
-  expect(hidden.interrupt('%2')).toEqual(['tmux', '-L', 'run-pane', 'send-keys', '-t', '%2', 'C-c'])
-  expect(hidden.close('%2')).toEqual(['tmux', '-L', 'run-pane', 'kill-pane', '-t', '%2'])
-  expect(hidden.idle('%2').slice(-3)).toEqual(['%2', '-L', 'run-pane'])
+  expect(hidden.read('%2', 50)).toEqual(['tmux', '-L', 'xdock', 'capture-pane', '-p', '-J', '-t', '%2', '-S', '-50'])
+  expect(hidden.interrupt('%2')).toEqual(['tmux', '-L', 'xdock', 'send-keys', '-t', '%2', 'C-c'])
+  expect(hidden.close('%2')).toEqual(['tmux', '-L', 'xdock', 'kill-pane', '-t', '%2'])
+  expect(hidden.idle('%2').slice(-3)).toEqual(['%2', '-L', 'xdock'])
   // A folder with quotes in it is only ever an argument.
   const split = hidden.split({ direction: 'right', cwd: "/w/it's $(x)", focus: false })
   expect(split.slice(0, 2)).toEqual(['sh', '-c'])
@@ -119,10 +119,10 @@ test('the hidden tmux server is the same driver on a socket of its own, with the
   // The visible tmux is unchanged: no socket.
   expect(driver('tmux').idle('%2')).toEqual(['sh', '-c', expect.any(String), 'sh', '%2'])
   // Not exec'ed: when the attach fails the window must stay, to say why.
-  expect(HIDDEN_ATTACH).toBe('env -u TMUX tmux -L run-pane attach -t run-pane')
-  expect(HIDDEN_ALIVE).toEqual(['tmux', '-L', 'run-pane', 'has-session', '-t', 'run-pane'])
+  expect(HIDDEN_ATTACH).toBe('env -u TMUX tmux -L xdock attach -t xdock')
+  expect(HIDDEN_ALIVE).toEqual(['tmux', '-L', 'xdock', 'has-session', '-t', 'xdock'])
   // The session starts with a keeper window, so the server outlives the shells of the runs.
-  expect(split[2]).toContain('new-session -d -s run-pane -n keeper')
+  expect(split[2]).toContain('new-session -d -s xdock -n keeper')
   expect(split[2]).toContain('sleep 2147483647')
   expect(isTmuxPane('%12')).toBe(true)
   for (const text of ['', '%', '%1;x', '1', '%1\n', '$(x)']) expect(isTmuxPane(text), text).toBe(false)

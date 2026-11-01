@@ -1,8 +1,8 @@
 <p align="center">
-  <img src=".claude-plugin/icon.png" alt="run-pane icon" width="96" height="96">
+  <img src=".claude-plugin/icon.png" alt="xdock icon" width="96" height="96">
 </p>
 
-<h1 align="center">run-pane</h1>
+<h1 align="center">xdock</h1>
 
 <p align="center">
   Run dev servers, test watchers and other commands in a Run pane beside your Claude Code chat,<br>
@@ -21,54 +21,54 @@
 ## Quick start
 
 1. Install it (see [Install](#install)).
-2. Type `/rp npm run dev` (or any command) at the prompt.
+2. Type `/x npm run dev` (or any command) at the prompt.
 3. Watch it run in the Run pane. Press **Stop (Ctrl+C)** when you are finished.
 
 | Command | What it does |
 | --- | --- |
-| `/rp <command>` | Runs the command in the Run pane. |
-| `/rp` | Opens the Run pane. |
-| `/rp close` | Closes the Run pane. Runs keep going. |
+| `/x <command>` | Runs the command in the Run pane. |
+| `/x` | Opens the Run pane. |
+| `/x close` | Closes the Run pane. Runs keep going. |
 | `/shell` | Opens a shell in the session's folder: a pane in herdr or tmux, else a terminal window (macOS). |
 
-`/rp` is a slash command, so it never reaches Claude and the prompt box clears by itself.
+`/x` is a slash command, so it never reaches Claude and the prompt box clears by itself.
 
 ## Install
 
 At the prompt of a terminal session:
 
 ```
-/plugin install run-pane --marketplace jaichandra/run-pane
+/plugin install xdock --marketplace jaichandra/xdock
 ```
 
 Or from a shell:
 
 ```
-claude plugin install run-pane --marketplace jaichandra/run-pane
+claude plugin install xdock --marketplace jaichandra/xdock
 ```
 
 Answer `y` to add the marketplace, then pick a scope (the first, user scope, keeps it on in every session). It is active in the current session at once.
 
-**Desktop app** (where `/plugin` does not run): click **+** next to the prompt box, then **Plugins**, **Add marketplace** with `jaichandra/run-pane`, then **Add plugin**.
+**Desktop app** (where `/plugin` does not run): click **+** next to the prompt box, then **Plugins**, **Add marketplace** with `jaichandra/xdock`, then **Add plugin**.
 
 ### Requirements
 
-- Works in the terminal (CLI) session, which is where it is known to work. `/rp` tells you when it cannot place the Run pane.
-- **Turn on the flicker-free display mode** (Claude Code calls it [fullscreen rendering](https://code.claude.com/docs/en/fullscreen)). The Run pane is built for it: it docks on the right of the chat (from about 110 columns wide) and its buttons work, because the mode adds mouse support. It is not a maximised window: a normal-sized window works. Without it the pane sits below the chat as a limited view and its buttons may not respond. Some setups start with it on (iTerm, Terminal.app) and some with it off (a plain Debian terminal, or a saved `"tui": "default"` setting). To turn it on, run `/tui fullscreen` in the session (it relaunches with your conversation intact and saves the choice), or start Claude Code with `CLAUDE_CODE_NO_FLICKER=1 claude`. `/rp` and the Run pane itself show a red notice, with a link to those docs, whenever it is in the limited view.
-- `/rp` runs commands through `sh`, `ps` and `kill`: macOS and Linux, not Windows.
+- Works in the terminal (CLI) session, which is where it is known to work. `/x` tells you when it cannot place the Run pane.
+- **Turn on the flicker-free display mode** (Claude Code calls it [fullscreen rendering](https://code.claude.com/docs/en/fullscreen)). The Run pane is built for it: it docks on the right of the chat (from about 110 columns wide) and its buttons work, because the mode adds mouse support. It is not a maximised window: a normal-sized window works. Without it the pane sits below the chat as a limited view and its buttons may not respond. Some setups start with it on (iTerm, Terminal.app) and some with it off (a plain Debian terminal, or a saved `"tui": "default"` setting). To turn it on, run `/tui fullscreen` in the session (it relaunches with your conversation intact and saves the choice), or start Claude Code with `CLAUDE_CODE_NO_FLICKER=1 claude`. `/x` and the Run pane itself show a red notice, with a link to those docs, whenever it is in the limited view.
+- `/x` runs commands through `sh`, `ps` and `kill`: macOS and Linux, not Windows.
 - `/shell` needs herdr or tmux, or macOS (Terminal or iTerm).
 
 ## Using it
 
 ### The Run pane
 
-`/rp` opens the Run pane and gives it the keyboard. From top to bottom it shows:
+`/x` opens the Run pane and gives it the keyboard. From top to bottom it shows:
 
 - the folder's name;
 - a command field, `$ `: type a command and press Enter;
 - **Suggestions**, as pills in one wrapping row after a dim `Try`, the words they share (`npm run`, `make`, `cargo`) said once, and coloured by what they do (lavender for running and serving, green for testing, grey for the rest); one row high, like the buttons at the bottom (press to run): `npm run <script>` for every script in the folder's `package.json` (`dev`, `start`, `serve`, `watch`, `test`, `build` and `lint` first), `cargo run` and `cargo test` where there is a `Cargo.toml`, and `make <target>` for each plain target of a `Makefile`; ten at most;
 - the runs, newest last: `●` running, `✓` exited with 0, `✗` exited with an error or could not start, `■` stopped; press one to see its output;
-- the output of the selected run, the last 2,000 lines of it, **in the colours and styles the command printed** (16, 256 and true colour, bold, dim, italic, underline, inverse and strikethrough). Commands run as they would in a pipe, so a tool that colours only for a terminal prints plain text; to have one colour anyway, start it with `FORCE_COLOR=1` (`/rp FORCE_COLOR=1 npm test`) or set `"forceColor": true` in `hooks/run-pane.json` for every command (a script that reads its tools' output for a phrase, like `compiled successfully`, can stop finding it once that is coloured). A line the command did not style is coloured by what it looks like: `# notes` dimmed, `▶` banners green, command lines (`npm`, `docker`, `make`, `git`, ...) and warnings in the warning colour, errors in the error colour, headings that end in a colon bold, errors (`Error:`, `ERR!`, `ERR_...`) and warnings (`DeprecationWarning:`, `deprecated`) by their words, stack frames dim, `==>` banners and `[tags]` in front. **URLs and files are presses**: a URL (`http` or `https`) opens in the browser, and a path that exists (`src/app.ts:12:5`, `./run.sh`, `~/notes/a.md`, resolved from the run's folder) opens with what your system opens it with (`open` on macOS, `xdg-open` elsewhere). A line a progress bar keeps redrawing shows its last state;
+- the output of the selected run, the last 2,000 lines of it, **in the colours and styles the command printed** (16, 256 and true colour, bold, dim, italic, underline, inverse and strikethrough). Commands run as they would in a pipe, so a tool that colours only for a terminal prints plain text; to have one colour anyway, start it with `FORCE_COLOR=1` (`/x FORCE_COLOR=1 npm test`) or set `"forceColor": true` in `hooks/xdock.json` for every command (a script that reads its tools' output for a phrase, like `compiled successfully`, can stop finding it once that is coloured). A line the command did not style is coloured by what it looks like: `# notes` dimmed, `▶` banners green, command lines (`npm`, `docker`, `make`, `git`, ...) and warnings in the warning colour, errors in the error colour, headings that end in a colon bold, errors (`Error:`, `ERR!`, `ERR_...`) and warnings (`DeprecationWarning:`, `deprecated`) by their words, stack frames dim, `==>` banners and `[tags]` in front. **URLs and files are presses**: a URL (`http` or `https`) opens in the browser, and a path that exists (`src/app.ts:12:5`, `./run.sh`, `~/notes/a.md`, resolved from the run's folder) opens with what your system opens it with (`open` on macOS, `xdg-open` elsewhere). A line a progress bar keeps redrawing shows its last state;
 - one row of buttons, last, so it stays in view while the Run pane follows the output (scroll back down to the last line and it follows the output again). Every button is a rectangle of a light colour (red for Stop, lavender for Restart, Attach and Open in shell, green for tests, grey for the rest) with a deep shade of it for the text, and the same colour 10% darker under the pointer. A row of space follows the title, the command field and the suggestions, so the parts of the pane do not run together.
 
 The buttons:
@@ -79,7 +79,7 @@ The buttons:
 | Restart | Runs a finished run's command again. |
 | Clear | Empties the selected run's output. |
 | Remove | Takes a finished run off the list. |
-| Open in shell | Opens the selected run in a terminal. A run in a hidden terminal: the same as Attach. A run in a pane beside Claude Code: says so. A process of the plugin (it runs on pipes, with no terminal to attach to): a terminal window (in the terminal Claude Code runs in, on macOS; elsewhere you get the line to type) with **all its output so far, then live**: the output is copied as it arrives to a private file (`run-pane-*.log` in `$TMPDIR`, removed with the run or when you leave) that the window tails. It is a view: typing there does not reach the process, and Ctrl+C there ends the viewing, not the run. With no run selected, the same as `/shell`. |
+| Open in shell | Opens the selected run in a terminal. A run in a hidden terminal: the same as Attach. A run in a pane beside Claude Code: says so. A process of the plugin (it runs on pipes, with no terminal to attach to): a terminal window (in the terminal Claude Code runs in, on macOS; elsewhere you get the line to type) with **all its output so far, then live**: the output is copied as it arrives to a private file (`xdock-*.log` in `$TMPDIR`, removed with the run or when you leave) that the window tails. It is a view: typing there does not reach the process, and Ctrl+C there ends the viewing, not the run. With no run selected, the same as `/shell`. |
 | Close pane | Closes the Run pane. Esc does the same. Runs keep going. |
 
 Commands run through `sh -lc` (a login shell, so `/etc/profile` and `~/.profile` apply) in the folder the session is in. The Run pane scrolls as a whole (mouse wheel, or the keys while it has the focus), follows new output while it is scrolled to the bottom, and stays where you left it once you scroll up; scrolling back to the last line follows it again. With the pane focused, Tab and the arrow keys walk its buttons, and Esc closes it.
@@ -96,7 +96,7 @@ A command runs as a process of the plugin, with its output in the Run pane, unle
 
 The Run pane follows those runs too: what the command prints, and while an editor or pager holds the screen, that screen (the last 50 rows).
 
-To change what counts, `hooks/run-pane.json` takes `"interactive": ["mytui"]` (first words that get a terminal) and `"panes": "all"` (every command gets one, as in 0.3).
+To change what counts, `hooks/xdock.json` takes `"interactive": ["mytui"]` (first words that get a terminal) and `"panes": "all"` (every command gets one, as in 0.3).
 
 #### In herdr, tmux and iTerm2
 
@@ -104,14 +104,14 @@ When Claude Code runs inside [herdr](https://herdr.dev) (`HERDR_ENV=1`), tmux (`
 
 **iTerm2** needs no tmux: the plugin splits iTerm's own panes with AppleScript, so the first time macOS may ask whether Claude Code may control iTerm (as for `/shell`). The new pane is split from the pane Claude Code runs in, never from whichever has the focus; it is read through iTerm's screen contents (scrollback included), and the shell is told to be at its prompt by the foreground process of the pane's terminal. A command with a control character in it is not typed (it would act as a key) and goes to the hidden tmux server below. `/shell` still opens a window there.
 
-- `/rp <command>` (for a command that needs a terminal, or any command with `"panes": "all"`) types the command into the pane of the last run if nothing is running in it (none of this plugin's runs, no command of yours in front of the prompt, and no background job such as `while true; do ./x.sh; sleep 1; done &` behind it, since that prints into the pane; jobs are looked for with `pgrep`, and a shell with helper processes of its own, like some prompt themes, counts as busy). Otherwise, or for the first run, it splits a new terminal pane (the first on the right of Claude Code, the next ones below the last) and types it there. It then follows what the pane shows. Your focus stays where it was. The terminal pane is a real terminal: click into it to answer a prompt or use an editor. The Run pane opens as for any command, listing the run with what it prints, and `run_output` returns it to Claude as before.
+- `/x <command>` (for a command that needs a terminal, or any command with `"panes": "all"`) types the command into the pane of the last run if nothing is running in it (none of this plugin's runs, no command of yours in front of the prompt, and no background job such as `while true; do ./x.sh; sleep 1; done &` behind it, since that prints into the pane; jobs are looked for with `pgrep`, and a shell with helper processes of its own, like some prompt themes, counts as busy). Otherwise, or for the first run, it splits a new terminal pane (the first on the right of Claude Code, the next ones below the last) and types it there. It then follows what the pane shows. Your focus stays where it was. The terminal pane is a real terminal: click into it to answer a prompt or use an editor. The Run pane opens as for any command, listing the run with what it prints, and `run_output` returns it to Claude as before.
 - Stop types Ctrl+C into the terminal pane; if the command ignores it for 30 s, or Force kill is pressed, the pane is closed. A finished run's pane stays open, so you can read it and the next command can use it. Remove closes it unless another run's output is on it too. Restart types the command again, in the same pane if it is free. Closing a pane yourself ends its run as stopped.
 - The command is typed into the pane exactly as you would type it, so the pane is your own shell with its history: prompt, command, result, and the earlier ones above. Your aliases and shell setup apply. The Run pane knows the command is over when the pane's shell is back at its prompt, and then marks the run `done` (○): a shell does not tell its exit code, so there is no `exit N` here. A command of several lines is not typed into a pane (it would run line by line); it runs as before.
 - When you leave the session (`/exit`, Ctrl+C or Ctrl+D), every pane the plugin opened, for runs and for `/shell`, is closed at once, and what runs in them ends with them (Claude Code gives an exit about a second, so they are not asked to stop first). A `/clear` keeps them.
-- If a pane cannot be made, the command runs as before, as a process of the plugin, so `/rp` never stops working because of the multiplexer.
+- If a pane cannot be made, the command runs as before, as a process of the plugin, so `/x` never stops working because of the multiplexer.
 - The output is read back about twice a second and holds the last 2000 lines.
-- Anywhere else (or in iTerm2 when its pane cannot be made), if tmux is installed, the same happens in a hidden tmux server of the plugin's own (`tmux -L run-pane`, never shown): each command that needs a terminal is typed into a window of it, and the Run pane follows that. `vi`, `less` and `ssh` work there: press **Attach** on the run to open a window on the server (iTerm or Terminal on macOS; elsewhere the button tells you the line to type, `tmux -L run-pane attach -t run-pane`; Ctrl+B d leaves it). While such a command holds the screen, the Run pane shows that screen (the last 50 rows), and its output once it is over. The server ends with the session, not when you `exit` a shell in it (a keeper window holds it open; Ctrl+B d leaves it). Without tmux, commands run as processes of the plugin, which have no terminal.
-- To turn this off, set `"multiplexer": false` in `hooks/run-pane.json` (see below).
+- Anywhere else (or in iTerm2 when its pane cannot be made), if tmux is installed, the same happens in a hidden tmux server of the plugin's own (`tmux -L xdock`, never shown): each command that needs a terminal is typed into a window of it, and the Run pane follows that. `vi`, `less` and `ssh` work there: press **Attach** on the run to open a window on the server (iTerm or Terminal on macOS; elsewhere the button tells you the line to type, `tmux -L xdock attach -t xdock`; Ctrl+B d leaves it). While such a command holds the screen, the Run pane shows that screen (the last 50 rows), and its output once it is over. The server ends with the session, not when you `exit` a shell in it (a keeper window holds it open; Ctrl+B d leaves it). Without tmux, commands run as processes of the plugin, which have no terminal.
+- To turn this off, set `"multiplexer": false` in `hooks/xdock.json` (see below).
 
 ### `/shell`
 
@@ -121,11 +121,11 @@ Elsewhere `/shell` says so and does nothing. The folder (for the macOS window) i
 
 ### `run_output`
 
-A tool for Claude, not for you: `mcp__run-pane__run_output`. It returns the last lines of a run (60 by default, 500 at most) with its status. Give `run` as the run's number or a part of its command; with none, the newest run. Claude sees a run's output only when it calls this tool.
+A tool for Claude, not for you: `mcp__xdock__run_output`. It returns the last lines of a run (60 by default, 500 at most) with its status. Give `run` as the run's number or a part of its command; with none, the newest run. Claude sees a run's output only when it calls this tool.
 
-## Optional: `hooks/run-pane.json`
+## Optional: `hooks/xdock.json`
 
-The mod needs no configuration. If you bundle it into your own tooling you can drop a `hooks/run-pane.json` next to `hooks/register.tsx` (a copy installed from this repository has none):
+The mod needs no configuration. If you bundle it into your own tooling you can drop a `hooks/xdock.json` next to `hooks/register.tsx` (a copy installed from this repository has none):
 
 ```json
 {
@@ -139,8 +139,8 @@ The mod needs no configuration. If you bundle it into your own tooling you can d
 - `interactive`: first words of commands that get a terminal, besides the ones the plugin knows (see Commands that need a terminal).
 - `panes`: `"all"` gives every command a terminal, not only the ones that need it, as 0.3 did.
 - `forceColor`: `true` starts every command with `FORCE_COLOR=1` and `CLICOLOR_FORCE=1`, so tools that colour only for a terminal colour in the pane. Off by default: colour changes the text other scripts read.
-- `multiplexer`: `false` keeps `/rp` out of herdr and tmux panes and out of the hidden tmux server, so it runs commands as processes of the plugin even inside them. `/shell` keeps using them.
-- `openFor`: words that make the pane open by itself, without taking the keyboard, when the folder's git remote (`origin`) or its path contains one of them (case does not matter; a linked worktree shares its repository's remote, so it counts). Anywhere else the pane waits for `/rp`.
+- `multiplexer`: `false` keeps `/x` out of herdr and tmux panes and out of the hidden tmux server, so it runs commands as processes of the plugin even inside them. `/shell` keeps using them.
+- `openFor`: words that make the pane open by itself, without taking the keyboard, when the folder's git remote (`origin`) or its path contains one of them (case does not matter; a linked worktree shares its repository's remote, so it counts). Anywhere else the pane waits for `/x`.
 
 Both are optional. A missing or unreadable file means the defaults.
 
