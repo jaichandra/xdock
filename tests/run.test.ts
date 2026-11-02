@@ -96,7 +96,8 @@ test('suggestions put package scripts first, then cargo, then make, up to ten', 
 
 test('the wrapper reports its pid before anything else', async () => {
   expect(readPid('@@xdock-pid 4242\nhello')).toEqual({ pid: 4242, rest: 'hello' })
-  expect(readPid('@@run-pa')).toBeUndefined()
+  expect(readPid('@@xdock-pi')).toBeUndefined()
+  expect(readPid('@@run-pa')).toEqual({ rest: '@@run-pa' })
   expect(readPid('@@xdock-pid 42')).toBeUndefined()
   expect(readPid('plain output')).toEqual({ rest: 'plain output' })
   expect(readPid('@@xdock-pid x\nrest')).toEqual({ rest: 'rest' })

@@ -468,9 +468,10 @@ test('the suggestions are rectangles in one wrapping row after a dim Try, with n
   const boxes = await ui.findAll({ type: 'Box' })
   const row = boxes.find(box => box.props?.flexWrap === 'wrap' && /^Try\s*npm run/.test(box.text ?? '') && (box.text ?? '').includes(' dev '))
   expect(row).toBeDefined()
-  // One row high, as the buttons at the bottom are: no cap over them, nothing but the row itself.
+  // One row high, as the buttons at the bottom are: no cap over them, nothing but the row itself; a row of space
+  // between the lines when it wraps (0.4.1).
   expect(row?.text).not.toContain('\u2584')
-  expect(row?.props?.rowGap).toBeUndefined()
+  expect(row?.props?.rowGap).toBe(1)
   // The words every one starts with are in the row once, not in each button.
   expect(((row?.text ?? '').match(/npm run/g) ?? []).length).toBe(1)
   expect(await faceOf(ui, 'dev')).toMatchObject({ color: BUTTON_COLORS.primary, backgroundColor: BUTTON_INKS.primary, inverse: true })
