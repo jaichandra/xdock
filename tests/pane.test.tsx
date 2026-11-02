@@ -644,8 +644,8 @@ test('a row of space after the title, and between the parts of the pane', async 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   const pane = (await ui.findAll({ type: 'Box' })).find(box => box.props?.flexDirection === 'column' && box.props?.flexShrink === 0)
   const kids = ((pane as unknown as { children?: { type?: string; children?: unknown[] }[] })?.children ?? []).map(child => (child.type === 'Text' && child.children?.[0] === ' ' ? '_' : child.type))
-  // Title, space, the command field, space, the suggestions, space, the (empty) runs text.
-  expect(kids.slice(0, 6)).toEqual(['Text', '_', 'Input', '_', 'Box', '_'])
+  // Title, space, the suggestions, space, the (empty) runs text. The command field is at the bottom, above the buttons.
+  expect(kids.slice(0, 4)).toEqual(['Text', '_', 'Box', '_'])
   await ui.unmount()
 })
 
@@ -657,8 +657,8 @@ test('with no run there is a row between the empty-state text and the buttons at
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   const root = (await ui.findAll({ type: 'Box' })).find(box => box.props?.flexDirection === 'column' && box.props?.height !== undefined)
   const kids = ((root as unknown as { children?: { type?: string; children?: unknown[] }[] })?.children ?? []).map(child => (child.type === 'Text' && child.children?.[0] === ' ' ? '_' : child.type))
-  // The top part, a row, the buttons.
-  expect(kids).toEqual(['Box', '_', 'Box'])
+  // The top part, a row, the command field, a row, the buttons.
+  expect(kids).toEqual(['Box', '_', 'Input', '_', 'Box'])
   await ui.unmount()
 })
 

@@ -708,6 +708,20 @@ const DOCK_COLUMNS = 60
 const DOCS_URL = 'https://code.claude.com/docs/en/fullscreen'
 const DOCK_HINT = `Limited view: the buttons need Claude Code's flicker-free display mode. Run /tui fullscreen (it saves the choice), or start with CLAUDE_CODE_NO_FLICKER=1 claude. Details: ${DOCS_URL}`
 
+// After a command is submitted from the pane's own field, the focus stays in that field. A command typed in the
+// Claude prompt (/x cmd) leaves the focus in the prompt: runPrompt opens the pane without asking for it then.
+async function keepFocus($: EngineInterface): Promise<void> {
+  try {
+    await $.clock.sleep(FOCUS_MS)
+    await $.ui.open({ id: PANE, title: 'Run', focus: true, closeOnEscape: true, columns: DOCK_COLUMNS })
+    await $.ui.focus({ requestId: PANE, key: 'cmd' })
+  } catch {
+    // The focus stays wherever the engine left it.
+  }
+}
+
+const FOCUS_MS = 50
+
 // What `/x` does: open the pane, and start the command if there is one.
 async function runPrompt($: EngineInterface, args: string, isFullscreen: boolean): Promise<string> {
   const cmd = args.trim()
@@ -717,7 +731,8 @@ async function runPrompt($: EngineInterface, args: string, isFullscreen: boolean
   }
   // The dock shows every run: a process of this mod draws its output there, and one in a terminal pane is followed.
   const run = cmd === '' ? undefined : await startRun($, cmd)
-  const placed = await $.ui.open({ id: PANE, title: 'Run', focus: true, closeOnEscape: true, columns: DOCK_COLUMNS })
+  // With a command typed in the Claude prompt, the keys stay there; `/x` alone is a request to type in the pane.
+  const placed = await $.ui.open({ id: PANE, title: 'Run', ...(cmd === '' ? { focus: true as const } : {}), closeOnEscape: true, columns: DOCK_COLUMNS })
   showStatus($)
   // Docked beside the transcript only in the fullscreen layout; otherwise it sits above the prompt.
   const hint = placed.isPlaced && !isFullscreen ? ` ${DOCK_HINT}` : ''
@@ -1130,19 +1145,6 @@ export const register: Register = on => {
           </Box>
         )}
         {isWelcome && <Text> </Text>}
-        {Input ? (
-          <Input
-            key="cmd"
-            label="$ "
-            placeholder="a command, then Enter"
-            value={typed}
-            onInput={value => void update($, draft, () => value)}
-            onSubmit={go}
-          />
-        ) : (
-          <Text dimColor>Type &gt; &lt;command&gt; to start one.</Text>
-        )}
-        {hints.length > 0 && <Text> </Text>}
         {hints.length > 0 && (
           // One row high, as the buttons at the bottom are: the words they share once, then a button each.
           <Box flexWrap="wrap" columnGap={1} rowGap={1}>
@@ -1199,6 +1201,27 @@ export const register: Register = on => {
         )}
         {/* With no run there is no output box between the text above and the buttons: a row stands in. */}
         {!picked && <Text> </Text>}
+        {/* The command line sits just above the buttons, where a terminal's prompt does. */}
+        {Input ? (
+          <Input
+            key="cmd"
+            autoFocus
+            label="$ "
+            placeholder="a command, then Enter"
+            value={typed}
+            onInput={value => void update($, draft, () => value)}
+            onSubmit={value => {
+              go(value)
+              // Enter in this field keeps the focus here: the engine hands the keys back to the prompt once the submit
+              // is handled, so wait that out, take them again for the pane, and put the ring on the field.
+              void keepFocus($)
+            }}
+          />
+        ) : (
+          <Text dimColor>Type &gt; &lt;command&gt; to start one.</Text>
+        )}
+        {/* A row between the command line and the buttons. */}
+        <Text> </Text>
         {toolbar()}
       </Box>
     )
