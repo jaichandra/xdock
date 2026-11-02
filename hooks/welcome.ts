@@ -20,11 +20,11 @@ export const WELCOME_LINES: readonly WelcomeLine[] = [
 ]
 
 // The rows the banner takes in a pane `columns` wide: the border, the title, the lines (counted high where they wrap),
-// the button and the row of space after it.
+// a row of space, the button and the row of space after it.
 export function welcomeRows(columns: number): number {
   const width = Math.max(20, columns - 4)
   const lines = WELCOME_LINES.reduce((sum, line) => sum + Math.max(1, Math.ceil((line.lead.length + 1 + line.text.length) / width)), 0)
-  return 2 + 1 + lines + 1 + 1
+  return 2 + 1 + lines + 1 + 1 + 1
 }
 
 // A pane too short for the banner and the dock's own parts does not show it.

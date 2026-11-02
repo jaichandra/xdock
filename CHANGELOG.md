@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **A row of space above the welcome banner's "Got it" button.**
+
 ## 0.5.3
 
 - **A welcome banner for first-time users.** The first time the dock opens it shows a short box at the top: run commands here, Claude can read the output, `/x` and `/shell`, links are presses, and `Attach` for programs that need a terminal. Press **Got it**, or run a first command, and it goes. That is remembered in `xdock-welcomed` in Claude Code's config folder (`$CLAUDE_CONFIG_DIR`, else `~/.claude`), so it shows once per person, not once per session. Delete the file to see it again. A pane under 30 rows high does not show it.

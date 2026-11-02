@@ -1137,6 +1137,7 @@ export const register: Register = on => {
                 <Text bold>{line.lead}</Text> {line.text}
               </Text>
             ))}
+            <Text> </Text>
             <Box>
               <Button plain key="welcome:dismiss" label="Got it" onPress={() => dismissWelcome($)}>
                 {face('Got it', 'success', 'welcome')}
