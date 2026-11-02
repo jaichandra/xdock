@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.5.4
 
+- **An "Ask Claude why" button next to a run that went wrong.** A run that could not start, ended with an exit code other than 0 (or was killed), or is still going but printed an error in its last 40 lines gets the button after its status. Pressing it asks Claude, as your own words, why that run failed, and points it at `run_output`. A run you stopped, or that exited 0, has none.
+- **Claude is told to read a run's output first.** The `run_output` description now names failed dev runs, servers and builds, and a line in the system prompt tells Claude to call it before searching logs, Docker or processes when asked why a command failed. Before, with the tool deferred, Claude could miss it.
 - **A row of space above the welcome banner's "Got it" button.**
 
 ## 0.5.3

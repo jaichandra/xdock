@@ -20,11 +20,14 @@ import {
   stripAnsi,
   suggestionKind,
   statusWords,
+  TROUBLE_LINES,
+  troubleOf,
+  troublePrompt,
   suggestions,
   withColor,
   WRAPPER,
 } from './run'
-import type { LogLine, PartKind, RunStatus } from './run'
+import type { LogLine, PartKind, RunStatus, Trouble } from './run'
 import { detectMux, driver, echoes, HIDDEN_ALIVE, HIDDEN_ATTACH, HIDDEN_SOCKET, isTmuxPane, itermSessionId, readPane, screenText, selectArgv, TMUX_VERSION } from './mux'
 import type { Mux } from './mux'
 import { hasControls, ITERM_PATH, lineArgv, linuxArgv, linuxTerminals, NOT_MACOS, oneLine, osascriptArgv, osascriptFailure, pickApp, shellTitle } from './shell'
@@ -114,6 +117,12 @@ async function pollWait($: EngineInterface): Promise<'poll'> {
 
 async function toastOf($: EngineInterface, text: Promise<string>): Promise<void> {
   $.ui.toast(await text)
+}
+
+// The person asks Claude why a run failed: sent as their own words, so Claude answers it as a question.
+async function askWhy($: EngineInterface, run: Run, trouble: Trouble): Promise<void> {
+  $.ui.toast(`Asked Claude about #${run.id}`)
+  await $.prompt.submit({ text: troublePrompt(run.id, run.cmd, trouble, TOOL), asUser: true })
 }
 
 function redraw($: EngineInterface): void {
@@ -892,7 +901,7 @@ export const register: Register = on => {
     await $.tool.register({
       name: 'run_output',
       description:
-        'The latest output of a command the person started in the dock (a dev server, a test run). Give `run` as its number or part of its command; with none, the newest run.',
+        'The latest output of a command the person started in the dock (a dev server, a test run, a build, a sandbox command). Call this FIRST when asked why a dev run, server, test or other command failed, crashed or printed something, or what it shows: before searching logs, Docker or processes. Give `run` as its number or part of its command; with none, the newest run.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -911,6 +920,22 @@ export const register: Register = on => {
   on('command.run', { command: 'x' }, async ($, e) => ({ text: await runPrompt($, e.args, e.presentation?.isFullscreen === true) }))
 
   on('command.run', { command: 'shell' }, async $ => ({ text: await openShell($) }))
+
+  // The tool is deferred in most sessions, so its description alone does not bring Claude to it when a
+  // person asks "why did the dev run fail". A standing line in the system prompt does.
+  on('prompt.compose', async ($, e, next) => {
+    const { sections } = await next(e)
+    return {
+      sections: [
+        ...sections,
+        {
+          id: 'xdock:run-output',
+          scope: 'session' as const,
+          text: `Commands the person runs in the xdock dock (a dev server, a test run, a build, a sandbox command) print their output there, and you see it only through the ${TOOL} tool (load it with ToolSearch if it is deferred). When asked why a dev run, server, test or command failed, crashed or hung, or what it printed, call ${TOOL} first, before searching logs, Docker or processes. Also call it after a run you were told about ends or looks stuck, instead of guessing.`,
+        },
+      ],
+    }
+  })
 
   on('tool.call', { tool: TOOL }, ($, e) => {
     const wanted = typeof e.run === 'string' ? e.run.trim() : ''
@@ -1167,7 +1192,9 @@ export const register: Register = on => {
         {/* A row between the suggestions and the runs. */}
         {hints.length > 0 && <Text> </Text>}
         {runs.length === 0 && <Text dimColor>Nothing running. Pick a suggestion or type a command.</Text>}
-        {runs.map(run => (
+        {runs.map(run => {
+          const trouble = troubleOf(run.status, run.code, run.log.tail(TROUBLE_LINES))
+          return (
           <Box key={`run:${run.id}`}>
             <Button
               plain
@@ -1182,9 +1209,16 @@ export const register: Register = on => {
                 {face('Attach', 'primary', `attach:${run.id}`)}
               </Button>
             )}
+            {trouble && <Text> </Text>}
+            {trouble && (
+              <Button plain key={`why:${run.id}`} label="Ask Claude why" onPress={() => void askWhy($, run, trouble)}>
+                {face('Ask Claude why', 'danger', `why:${run.id}`)}
+              </Button>
+            )}
             {run.isInteractive && run.mux && run.mux !== 'hidden' && run.status === 'running' && <Text dimColor> in a terminal pane</Text>}
           </Box>
-        ))}
+          )
+        })}
         </Box>
         {picked && (
           <Box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={3} borderStyle="round" borderDimColor paddingX={1}>

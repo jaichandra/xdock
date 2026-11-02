@@ -302,6 +302,26 @@ export function statusWords(status: RunStatus, code: number | null): string {
   return code === null ? 'killed' : `exit ${code}`
 }
 
+/** How many of the last lines are read for errors. */
+export const TROUBLE_LINES = 40
+
+export type Trouble = 'failed' | 'errors'
+
+/** Whether a run is worth asking Claude about: it did not start or ended with a code other than 0 (or was killed,
+ * which a Stop is not), or it is still going and its last lines say an error. A run stopped by the person, or ended
+ * with 0, is not. */
+export function troubleOf(status: RunStatus, code: number | null, tail: readonly string[]): Trouble | undefined {
+  if (status === 'failed' || (status === 'exited' && code !== 0)) return 'failed'
+  if (status === 'stopped' || status === 'exited') return undefined
+  return tail.some(line => highlight(line).some(part => part.kind === 'error')) ? 'errors' : undefined
+}
+
+/** What the button asks Claude: the run to look at and the tool that shows its output. */
+export function troublePrompt(id: number, cmd: string, trouble: Trouble, tool: string): string {
+  const what = trouble === 'failed' ? 'fail' : 'print errors'
+  return `Why did #${id} \`${cmd}\` in the dock ${what}? Read its output with ${tool}, then tell me the cause and how to fix it.`
+}
+
 /** Whether any pattern occurs in the text, ignoring case. No patterns match nothing. */
 export function matchesAny(text: string, patterns: readonly string[]): boolean {
   const lower = text.toLowerCase()

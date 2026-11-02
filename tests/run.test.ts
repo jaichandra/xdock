@@ -22,6 +22,8 @@ import {
   stripAnsi,
   suggestionKind,
   suggestions,
+  troubleOf,
+  troublePrompt,
 } from '../hooks/run'
 
 test('colour and title escapes are stripped, the text stays', async () => {
@@ -307,4 +309,23 @@ test('ls, grep and diff are asked to colour when the command is a plain one', ()
 
 test('claude command lines are coloured as commands', () => {
   expect(highlight('claude plugin validate .')).toEqual([{ text: 'claude plugin validate .', kind: 'command' }])
+})
+
+test('a run is worth asking Claude about when it did not start, ended badly, or is printing errors', async () => {
+  expect(troubleOf('failed', null, [])).toBe('failed')
+  expect(troubleOf('exited', 1, [])).toBe('failed')
+  expect(troubleOf('exited', null, [])).toBe('failed')
+  expect(troubleOf('exited', 0, ['Error: not a failure of the run'])).toBeUndefined()
+  expect(troubleOf('stopped', null, ['Error: boom'])).toBeUndefined()
+  expect(troubleOf('running', null, ['ready on :3000'])).toBeUndefined()
+  expect(troubleOf('running', null, ['ready', 'TypeError: x is not a function'])).toBe('errors')
+  expect(troubleOf('done', null, ['npm ERR! missing script'])).toBe('errors')
+})
+
+test('the question names the run and the tool that shows its output', async () => {
+  const text = troublePrompt(3, 'npm run dev', 'failed', 'mcp__xdock__run_output')
+  expect(text).toContain('#3 `npm run dev`')
+  expect(text).toContain('fail')
+  expect(text).toContain('mcp__xdock__run_output')
+  expect(troublePrompt(3, 'npm run dev', 'errors', 'x')).toContain('print errors')
 })

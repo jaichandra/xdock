@@ -28,11 +28,14 @@ const gt = async ($: Parameters<Parameters<typeof test>[1]>[0], args: string) =>
 // Stands for the engine beneath the mod: the calls the mod makes are answered here.
 function engine(
   on: On,
-  process: { calls: string[][]; lines: string[]; remote?: string; opened?: string[]; toasts?: string[]; writes?: { argv: string[]; stdin?: string | undefined }[]; later?: { gate: Promise<void>; lines: string[] }; isFsHung?: boolean; spawns?: { argv: readonly string[]; env?: Record<string, string> | undefined }[]; existing?: string[]; system?: string; env?: Record<string, string>; isNew?: boolean; marker?: { writes: { path: string; text: string }[] } },
+  process: { calls: string[][]; lines: string[]; remote?: string; opened?: string[]; toasts?: string[]; sent?: { text: string; asUser?: true | undefined }[]; writes?: { argv: string[]; stdin?: string | undefined }[]; later?: { gate: Promise<void>; lines: string[] }; isFsHung?: boolean; spawns?: { argv: readonly string[]; env?: Record<string, string> | undefined }[]; existing?: string[]; system?: string; env?: Record<string, string>; isNew?: boolean; marker?: { writes: { path: string; text: string }[] } },
   files: Record<string, string> = { 'package.json': '{"scripts":{"dev":"vite","test":"vitest"}}' },
 ) {
   on('command.register', (_, e) => ({ value: { command: e.name } }))
-  on('prompt.submit', (_, e) => ({ text: e.text }))
+  on('prompt.submit', (_, e) => {
+    process.sent?.push({ text: e.text, asUser: (e.origin as { asUser?: true }).asUser })
+    return { text: e.text }
+  })
   on('tool.register', () => ({ value: { tool: 'mcp__xdock__run_output' } }))
   on('ui.open', (_, e) => {
     process.opened?.push(e.id)
@@ -687,4 +690,32 @@ test('a person who has seen the banner does not see it, and a first command coun
   const old = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect(await old.find({ type: 'Text', text: /Welcome to xdock/ })).toBeUndefined()
   await old.unmount()
+})
+
+test('a run that prints an error has an Ask Claude why button that sends the question as the person\'s own words', async ($, on) => {
+  const process = { calls: [] as string[][], lines: ['ready on :3000\n', 'Error: connect ECONNREFUSED 127.0.0.1:5432\n'], toasts: [] as string[], sent: [] as { text: string; asUser?: true | undefined }[] }
+  engine(on, process)
+  const sent = process.sent
+  await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
+  await gt($, 'npm run dev')
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ key: 'why:1' })).toBeDefined()
+  await ui.press({ key: 'why:1' })
+  expect(sent[0]?.text).toContain('#1 `npm run dev`')
+  expect(sent[0]?.text).toContain('mcp__xdock__run_output')
+  expect(sent[0]?.asUser).toBe(true)
+  expect(process.toasts).toContain('Asked Claude about #1')
+  await ui.unmount()
+})
+
+test('a run with nothing wrong in its output has no Ask Claude why button', async ($, on) => {
+  const process = { calls: [] as string[][], lines: ['ready on :3000\n'] }
+  engine(on, process)
+  await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
+  await gt($, 'npm run dev')
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ key: 'why:1' })).toBeUndefined()
+  await ui.unmount()
 })
