@@ -68,6 +68,7 @@ Answer `y` to add the marketplace, then pick a scope (the first, user scope, kee
 
 `/x` opens the dock and gives it the keyboard. From top to bottom it shows:
 
+- a **welcome banner**, the first time only: what the dock is for and the few things worth knowing. **Got it** (or running a first command) hides it for good; delete `xdock-welcomed` from `~/.claude` (or `$CLAUDE_CONFIG_DIR`) to see it again;
 - the folder's name;
 - a command field, `$ `: type a command and press Enter;
 - **Suggestions**, as pills in one wrapping row after a dim `Try`, the words they share (`npm run`, `make`, `cargo`) said once, and coloured by what they do (lavender for running and serving, green for testing, grey for the rest); one row high, like the buttons at the bottom (press to run): `npm run <script>` for every script in the folder's `package.json` (`dev`, `start`, `serve`, `watch`, `test`, `build` and `lint` first), `cargo run` and `cargo test` where there is a `Cargo.toml`, and `make <target>` for each plain target of a `Makefile`; ten at most;

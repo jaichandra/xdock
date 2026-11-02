@@ -29,6 +29,7 @@ import { detectMux, driver, echoes, HIDDEN_ALIVE, HIDDEN_ATTACH, HIDDEN_SOCKET, 
 import type { Mux } from './mux'
 import { hasControls, ITERM_PATH, lineArgv, linuxArgv, linuxTerminals, NOT_MACOS, oneLine, osascriptArgv, osascriptFailure, pickApp, shellTitle } from './shell'
 import type { TerminalApp } from './shell'
+import { WELCOME_LINES, WELCOME_MIN_ROWS, welcomePath, welcomeRows } from './welcome'
 
 const PANE = 'run'
 const TOOL = 'mcp__xdock__run_output'
@@ -592,6 +593,8 @@ async function startRun($: EngineInterface, cmd: string): Promise<Run> {
   isPinnedTop = true
   const run: Run = { id: ++seq, cmd, cwd: await $.session.cwd(), status: 'running', code: null, log: new RunLog() }
   runs.push(run)
+  // A first command is proof enough that the banner was read.
+  dismissWelcome($)
   const done = runs.filter(one => one.status !== 'running')
   for (const old of done.slice(0, Math.max(0, runs.length - KEEP_RUNS))) {
     runs.splice(runs.indexOf(old), 1)
@@ -721,6 +724,38 @@ async function runPrompt($: EngineInterface, args: string, isFullscreen: boolean
   if (cmd === '') return placed.isPlaced ? `The dock is open.${hint}` : 'The dock needs a wider terminal (about 110 columns) or the flicker-free display mode (CLAUDE_CODE_NO_FLICKER=1 claude).'
   const where = run?.mux === 'hidden' ? ' (needs a terminal: press Attach in the dock)' : run?.mux ? ` (in ${run.mux === 'iterm' ? 'an iTerm2' : `a ${run.mux}`} pane beside Claude Code)` : ''
   return `Started #${run?.id}: ${cmd}${where}${placed.isPlaced ? hint : ' (the dock needs a wider terminal to show it)'}`
+}
+
+// Whether the first-time banner is on show: unknown until the marker file is read (nothing is drawn meanwhile), then
+// shown until it is dismissed or a first command runs.
+let welcome: 'unknown' | 'shown' | 'gone' = 'unknown'
+
+async function markerOf($: EngineInterface): Promise<string | undefined> {
+  const [configDir, home] = await Promise.all([envOf($.env.get('CLAUDE_CONFIG_DIR')), envOf($.env.get('HOME'))])
+  return welcomePath(configDir, home)
+}
+
+async function loadWelcome($: EngineInterface): Promise<void> {
+  try {
+    const path = await markerOf($)
+    // No place to remember it: the banner is not shown, rather than shown every time.
+    const isSeen = path === undefined || (await $.fs.read(path).then(() => true, () => false))
+    welcome = isSeen ? 'gone' : 'shown'
+  } catch {
+    welcome = 'gone'
+  }
+  redraw($)
+}
+
+// Hides the banner and remembers that it was seen.
+function dismissWelcome($: EngineInterface): void {
+  if (welcome === 'gone') return
+  welcome = 'gone'
+  redraw($)
+  void (async () => {
+    const path = await markerOf($)
+    if (path) await $.fs.write(path, `${new Date().toISOString()}\n`)
+  })().catch(() => undefined)
 }
 
 const open = (id: number): Run | undefined => runs.find(run => run.id === id)
@@ -853,6 +888,7 @@ export const register: Register = on => {
     })
     showStatus($)
     void openIfWanted($).catch(() => undefined)
+    void loadWelcome($)
     return next(e)
   })
 
@@ -939,8 +975,9 @@ export const register: Register = on => {
     const hintLines = hints.length > 0 ? Math.max(1, Math.ceil(hintWidth / Math.max(20, e.props.bodyColumns - 2))) : 0
     // A row of space between the lines of buttons too.
     const hintRows = hints.length > 0 ? hintLines * 2 : 0
+    const isWelcome = welcome === 'shown' && rows >= WELCOME_MIN_ROWS
     const chrome =
-      1 + 1 + (e.props.placement === 'inline' ? 4 : 0) + 1 + (hints.length > 0 ? 1 : 0) + hintRows + Math.max(1, runs.length) + 3 + (e.props.bodyColumns < 80 ? 2 : 1)
+      (isWelcome ? welcomeRows(e.props.bodyColumns) : 0) + 1 + 1 + (e.props.placement === 'inline' ? 4 : 0) + 1 + (hints.length > 0 ? 1 : 0) + hintRows + Math.max(1, runs.length) + 3 + (e.props.bodyColumns < 80 ? 2 : 1)
     const visible = Math.max(1, rows - chrome)
     newest = Math.max(0, (picked?.log.size() ?? 0) - visible)
     back = isPinnedTop && picked?.isInteractive ? newest : Math.min(back, newest)
@@ -1075,6 +1112,24 @@ export const register: Register = on => {
             {DOCK_HINT}
           </Text>
         )}
+        {isWelcome && (
+          <Box flexDirection="column" flexShrink={0} borderStyle="round" borderColor="suggestion" paddingX={1}>
+            <Text bold color="suggestion">
+              Welcome to xdock
+            </Text>
+            {WELCOME_LINES.map(line => (
+              <Text key={`welcome:${line.lead}`} wrap="wrap">
+                <Text bold>{line.lead}</Text> {line.text}
+              </Text>
+            ))}
+            <Box>
+              <Button plain key="welcome:dismiss" label="Got it" onPress={() => dismissWelcome($)}>
+                {face('Got it', 'success', 'welcome')}
+              </Button>
+            </Box>
+          </Box>
+        )}
+        {isWelcome && <Text> </Text>}
         {Input ? (
           <Input
             key="cmd"

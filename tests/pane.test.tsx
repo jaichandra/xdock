@@ -28,7 +28,7 @@ const gt = async ($: Parameters<Parameters<typeof test>[1]>[0], args: string) =>
 // Stands for the engine beneath the mod: the calls the mod makes are answered here.
 function engine(
   on: On,
-  process: { calls: string[][]; lines: string[]; remote?: string; opened?: string[]; toasts?: string[]; writes?: { argv: string[]; stdin?: string | undefined }[]; later?: { gate: Promise<void>; lines: string[] }; isFsHung?: boolean; spawns?: { argv: readonly string[]; env?: Record<string, string> | undefined }[]; existing?: string[]; system?: string; env?: Record<string, string> },
+  process: { calls: string[][]; lines: string[]; remote?: string; opened?: string[]; toasts?: string[]; writes?: { argv: string[]; stdin?: string | undefined }[]; later?: { gate: Promise<void>; lines: string[] }; isFsHung?: boolean; spawns?: { argv: readonly string[]; env?: Record<string, string> | undefined }[]; existing?: string[]; system?: string; env?: Record<string, string>; isNew?: boolean; marker?: { writes: { path: string; text: string }[] } },
   files: Record<string, string> = { 'package.json': '{"scripts":{"dev":"vite","test":"vitest"}}' },
 ) {
   on('command.register', (_, e) => ({ value: { command: e.name } }))
@@ -50,7 +50,16 @@ function engine(
   })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/w/sample-app' }))
+  // The person has seen the welcome banner, unless a test says they are new.
+  on('fs.write', (_, e) => {
+    process.marker?.writes.push({ path: e.path, text: e.text })
+    return { value: undefined }
+  })
   on('fs.read', (_, e) => {
+    if (e.path.endsWith('xdock-welcomed')) {
+      if (process.isNew && !process.marker?.writes.length) throw new Error('missing')
+      return { value: '1' }
+    }
     const name = Object.keys(files).find(file => e.path.endsWith(file))
     if (name !== undefined) return { value: files[name] as string }
     throw new Error('missing')
@@ -650,4 +659,31 @@ test('with no run there is a row between the empty-state text and the buttons at
   // The top part, a row, the buttons.
   expect(kids).toEqual(['Box', '_', 'Box'])
   await ui.unmount()
+})
+
+test('a first-time person sees a welcome banner above the command field, once', async ($, on) => {
+  const process = { calls: [] as string[][], lines: [], isNew: true, marker: { writes: [] as { path: string; text: string }[] } }
+  engine(on, process)
+  await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /Welcome to xdock/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Attach/ })).toBeDefined()
+  await ui.find({ key: 'welcome:dismiss' })
+  await ui.press({ key: 'welcome:dismiss' })
+  expect(process.marker.writes.map(write => write.path)).toEqual(['/Users/me/.claude/xdock-welcomed'])
+  await ui.unmount()
+
+  const again = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await again.find({ type: 'Text', text: /Welcome to xdock/ })).toBeUndefined()
+  await again.unmount()
+})
+
+test('a person who has seen the banner does not see it, and a first command counts as seen', async ($, on) => {
+  const seen = { calls: [] as string[][], lines: [] }
+  engine(on, seen)
+  await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
+  const old = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await old.find({ type: 'Text', text: /Welcome to xdock/ })).toBeUndefined()
+  await old.unmount()
 })
