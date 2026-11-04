@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="The xdock dock beside a Claude Code chat, showing the output of a command" width="800">
+  <img src="docs/demo.gif" alt="Demo: a dev server crashes in the xdock dock, and Claude explains why without anything being pasted" width="800">
 </p>
 
 ## Try it in 60 seconds
