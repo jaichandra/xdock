@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.6
+
+- **`forceColor` ships off.** `hooks/xdock.json` no longer sets `"forceColor": true`, which is what the README always said the default was. With it on, every command ran with `FORCE_COLOR=1`, and a script that looks for a phrase in a tool's output (`compiled successfully` from a build) never found it once the tool coloured it, so such a script could sit forever waiting. Commands now run as they would in a pipe; colour is opt-in with `"forceColor": true` in `hooks/xdock.json`, or per command (`FORCE_COLOR=1 npm test`).
+
 ## 0.5.5
 
 - **Every process keeps all its output, as it printed it, in a private file.** From its first byte, a run's output is copied to `xdock-*.log` in `$TMPDIR` (readable only by you), colours, `\r` redraws and unfinished lines included, so nothing the dock cuts at its edge, tidies or scrolls off after 2,000 lines is lost. Open in shell follows that file from its first line, and `run_output` ends its answer with the file's path, so Claude can search all of it. Before, the file was made only by Open in shell, from the dock's tidied copy.
