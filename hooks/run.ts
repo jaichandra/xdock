@@ -388,6 +388,10 @@ export function isAtBottom(move: { offset: number; bodyRows: number; contentRows
   return move.contentRows <= move.bodyRows || move.offset >= move.contentRows - move.bodyRows
 }
 
+/** Whether a command sets one of the variables that decide colour (`NO_COLOR=1 npm test`): it has said what it
+ * wants, so `forceColor` leaves it alone. Only an assignment counts, not the name as an argument. */
+export const setsColor = (cmd: string): boolean => /(?:^|[\s;&|(])(?:FORCE_COLOR|NO_COLOR|CLICOLOR_FORCE)=/.test(cmd)
+
 const COLOR_FIRST = new Set(['ls', 'grep', 'egrep', 'fgrep', 'diff'])
 
 /** A command that colours only when told to, told to: `ls`, `grep` and `diff` take `--color=always` (a pipe is not a

@@ -23,6 +23,7 @@ import {
   TROUBLE_LINES,
   troubleOf,
   troublePrompt,
+  setsColor,
   suggestions,
   withColor,
   WRAPPER,
@@ -65,7 +66,8 @@ type Run = {
   isStopping?: boolean
   // Force kill was pressed: no more waiting.
   isForced?: boolean
-  // Where the output is copied for a terminal window that follows it (Open in shell), once there is one.
+  // Where everything the process printed is kept, as it printed it: for a terminal window that follows it (Open in
+  // shell), and for Claude to search when the dock's last 2,000 lines are not enough.
   spool?: { path: string; buffer: string; isFlushing: boolean }
   // Ends the read loop, which leaves the stream and so kills the shell the engine started.
   release?: () => void
@@ -352,8 +354,9 @@ async function attach($: EngineInterface, run: Run): Promise<string> {
   return (await attachPane($, run.pane, `run #${run.id}`)).replace('run the command again', `run #${run.id} again with Restart`)
 }
 
-// What follows the output of a process of the plugin in a terminal window (Open in shell): the output is copied to a
-// file (private to the person) as it arrives, in pieces a quarter of a second apart, and the window tails the file.
+// Everything a process of the plugin prints is copied, as it arrives, to a file private to the person: in pieces a
+// quarter of a second apart, byte for byte (colours, `\r` redraws, cursor moves), so nothing the dock cuts, tidies or
+// scrolls off is lost. A terminal window (Open in shell) tails it, and Claude is told its path.
 const SPOOL_MS = 250
 
 async function flushSpool($: EngineInterface, spool: NonNullable<Run['spool']>): Promise<void> {
@@ -386,28 +389,26 @@ function dropSpool($: EngineInterface, run: Run): void {
   if (spool) void $.process.run(['rm', '-f', '--', spool.path], { timeoutMs: MUX_MS }).catch(() => undefined)
 }
 
+// A run's file, named before it prints anything (it is made by the first piece written to it).
+async function startSpool($: EngineInterface, run: Run): Promise<void> {
+  const tmp = ((await envOf($.env.get('TMPDIR'))) ?? '/tmp').replace(/\/$/, '')
+  run.spool = { path: `${tmp}/xdock-${Date.now().toString(36)}-${run.id}.log`, buffer: '', isFlushing: false }
+}
+
 // A terminal window that shows everything a process of the plugin has printed, then what it prints on: the process is
 // on pipes, not on a terminal, so there is nothing to attach to, and the window only reads (what is typed there does
 // not reach the process, and Ctrl+C there ends the viewing, not the run).
 async function mirror($: EngineInterface, run: Run): Promise<string> {
   try {
-    if (!run.spool) {
-      const tmp = ((await envOf($.env.get('TMPDIR'))) ?? '/tmp').replace(/\/$/, '')
-      const spool = { path: `${tmp}/xdock-${Date.now().toString(36)}-${run.id}.log`, buffer: '', isFlushing: true }
-      // Set and read together: what the run prints from now on goes to the buffer, and what it printed is the dump.
-      run.spool = spool
-      const dump = run.log.dump()
-      const made = await $.process.run(['sh', '-c', 'umask 077; cat > "$1"', 'sh', spool.path], { stdin: dump, timeoutMs: MUX_MS })
-      if (made.exitCode !== 0) {
-        run.spool = undefined
-        return `Could not copy the output for a terminal: ${oneLine(made.stderr || made.stdout) || `exit ${made.exitCode}`}`
-      }
-      await flushSpool($, spool)
-      if (run.status !== 'running') spoolTo($, run, `\n[xdock] #${run.id} ${statusWords(run.status, run.code)}\n`)
-    }
+    const spool = run.spool
+    if (!spool) return `#${run.id} has no output file to follow.`
+    // What it has printed so far is on disk, and the file is there even if it has printed nothing yet.
+    await flushSpool($, spool)
+    const touched = await $.process.run(['sh', '-c', 'umask 077; : >> "$1"', 'sh', spool.path], { timeoutMs: MUX_MS })
+    if (touched.exitCode !== 0) return `Could not open the output file for a terminal: ${oneLine(touched.stderr || touched.stdout) || `exit ${touched.exitCode}`}`
     // The window starts in the folder the command ran in, so what is typed there next is in the same place.
     if (hasControls(run.cwd)) return "The run's folder has a control character in its name, so it is not typed into a terminal: open one there yourself."
-    const line = `cd -- ${shellQuote(run.cwd)} && tail -n +1 -f -- ${shellQuote(run.spool.path)}`
+    const line = `cd -- ${shellQuote(run.cwd)} && tail -n +1 -f -- ${shellQuote(spool.path)}`
     const way = `Type this in a terminal (Ctrl+C there ends the viewing, not the run): ${line}`
     const system = await $.process.run(['uname', '-s'], { timeoutMs: 3_000 }).catch(() => undefined)
     if (system?.stdout.trim() !== 'Darwin') {
@@ -628,13 +629,16 @@ async function startRun($: EngineInterface, cmd: string): Promise<Run> {
     if ((!mux || mux === 'iterm') && (await canHide($)) && (await startInPane($, run, 'hidden', stopped))) return run
     run.log.push('(no terminal to give it here: tmux, herdr or iTerm2 would, so it runs without one and cannot be typed to)\n')
   }
+  await startSpool($, run)
   void (async () => {
     // Tools that colour only for a terminal are asked to anyway only when the person says so (`forceColor`): the
-    // pane draws the colours it is given, but a command's own output is what other tools read.
+    // pane draws the colours it is given, but a command's own output is what other tools read. A command that sets its
+    // own colour (`NO_COLOR=1 make build`, whose script looks for a phrase like `compiled successfully`) is left as it is.
+    const isColored = config.forceColor === true && !setsColor(cmd)
     const stream = $.process.spawn({
-      argv: ['sh', '-c', WRAPPER, 'sh', config.forceColor === true ? withColor(cmd) : cmd],
+      argv: ['sh', '-c', WRAPPER, 'sh', isColored ? withColor(cmd) : cmd],
       cwd: run.cwd,
-      ...(config.forceColor === true ? { env: { FORCE_COLOR: '1', CLICOLOR_FORCE: '1' } } : {}),
+      ...(isColored ? { env: { FORCE_COLOR: '1', CLICOLOR_FORCE: '1' } } : {}),
     })
     const it = stream[Symbol.asyncIterator]()
     let head: string | undefined = ''
@@ -937,7 +941,7 @@ export const register: Register = on => {
     }
   })
 
-  on('tool.call', { tool: TOOL }, ($, e) => {
+  on('tool.call', { tool: TOOL }, async ($, e) => {
     const wanted = typeof e.run === 'string' ? e.run.trim() : ''
     const run = wanted
       ? runs.find(one => String(one.id) === wanted.replace(/^#/, '')) ?? [...runs].reverse().find(one => one.cmd.includes(wanted))
@@ -945,8 +949,11 @@ export const register: Register = on => {
     if (!run) return { result: runs.length === 0 ? 'Nothing has been run in the dock yet.' : `No run matches "${wanted}".` }
     const count = typeof e.lines === 'number' && e.lines > 0 ? Math.min(Math.floor(e.lines), 500) : 60
     const lines = run.log.tail(count)
+    // The file is current when Claude reads it, and it holds all of the output, which the dock keeps only 2,000 lines of.
+    if (run.spool) await flushSpool($, run.spool)
+    const file = run.spool ? [`All of its output, as it was printed (with colour codes; nothing cut): ${run.spool.path}`] : []
     return {
-      result: [`#${run.id} ${run.cmd} (${statusWords(run.status, run.code)}), last ${lines.length} of ${run.log.size()} lines:`, ...lines].join('\n'),
+      result: [`#${run.id} ${run.cmd} (${statusWords(run.status, run.code)}), last ${lines.length} of ${run.log.size()} lines:`, ...lines, ...file].join('\n'),
     }
   })
 
@@ -1230,7 +1237,12 @@ export const register: Register = on => {
             {/* First, so at the bottom: it takes the room the lines leave, which keeps a short output at the top. */}
             <Box flexGrow={1} />
             {picked.log.size() === 0 && <Text dimColor>No output yet.</Text>}
-            {output.map(drawLine)}
+            {/* A row that cannot shrink: in a box shorter than its lines they would be squeezed to no height and painted over one another. */}
+            {output.map(entry => (
+              <Box key={`line:${entry.at}`} flexShrink={0}>
+                {drawLine(entry)}
+              </Box>
+            ))}
             </Box>
           </Box>
         )}

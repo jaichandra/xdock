@@ -490,8 +490,34 @@ test('the suggestions are rectangles in one wrapping row after a dim Try, with n
   await ui.unmount()
 })
 
-test('Open in shell on a process of the plugin opens a window with all its output so far, copied to a private file', async ($, on) => {
-  const process = { calls: [] as string[][], lines: ['one\n', '\u001b[32mtwo\u001b[0m\n', 'partial'], toasts: [] as string[], writes: [] as { argv: string[]; stdin?: string | undefined }[] }
+test('every process of the plugin keeps all it prints, as it printed it, in a private file from its first byte', async ($, on) => {
+  const process = { calls: [] as string[][], lines: ['one\n', '\u001b[32mtwo\u001b[0m\r', 'partial'], writes: [] as { argv: string[]; stdin?: string | undefined }[] }
+  engine(on, process)
+  on('clock.sleep', async () => {
+    await new Promise<void>(resolve => setTimeout(resolve, 1))
+    return { value: undefined }
+  })
+  await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
+  await gt($, 'npm run dev')
+  await untilPrinted($, 'partial')
+  await new Promise<void>(resolve => setTimeout(resolve, 60))
+
+  // Nobody else can read it (umask 077), and what is in it is what the command wrote: its colours, its `\r`, its
+  // unfinished line, none of it cut or tidied.
+  const appended = process.writes.filter(write => write.argv[2]?.includes('cat >>'))
+  expect(appended.length).toBeGreaterThan(0)
+  expect(appended[0]?.argv[2]).toContain('umask 077')
+  expect(appended.map(write => write.stdin).join('')).toBe('one\n\u001b[32mtwo\u001b[0m\rpartial')
+  const path = appended[0]?.argv[4] ?? ''
+  expect(path).toMatch(/^\/tmp\/xdock-[a-z0-9]+-1\.log$/)
+  expect(new Set(appended.map(write => write.argv[4])).size).toBe(1)
+  // Claude is told where it is, since the tool answers with only the last lines the dock holds.
+  const answer = String((await $.tool.call({ tool: 'mcp__xdock__run_output' })).result)
+  expect(answer).toContain(path)
+})
+
+test('Open in shell on a process of the plugin opens a window that follows its file from the first line', async ($, on) => {
+  const process = { calls: [] as string[][], lines: ['one\n', 'partial'], toasts: [] as string[], writes: [] as { argv: string[]; stdin?: string | undefined }[] }
   engine(on, process)
   await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
   await gt($, 'npm run dev')
@@ -500,12 +526,7 @@ test('Open in shell on a process of the plugin opens a window with all its outpu
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await ui.press({ key: 'shell' })
   await new Promise<void>(resolve => setTimeout(resolve, 60))
-  // The whole log goes to a file nobody else can read (umask 077), whole lines with a reset after each, the
-  // unfinished one as it is.
-  const made = process.writes.find(write => write.argv[2]?.includes('cat >'))
-  expect(made?.argv[2]).toContain('umask 077')
-  expect(made?.stdin).toBe('one\u001b[0m\n\u001b[32mtwo\u001b[0m\u001b[0m\npartial')
-  const path = made?.argv[4] ?? ''
+  const path = process.writes.find(write => write.argv[2]?.includes('cat >>'))?.argv[4] ?? ''
   expect(path).toMatch(/^\/tmp\/xdock-[a-z0-9]+-1\.log$/)
   // The window tails it from its first line: all so far, then live. The path is quoted, never part of a script.
   const window = process.calls.find(argv => argv[0] === 'osascript')
@@ -582,7 +603,7 @@ test('pressing Open in shell again opens another window on the same file', async
   const windows = process.calls.filter(argv => argv[0] === 'osascript')
   expect(windows).toHaveLength(2)
   expect(windows[0]?.[4]).toBe(windows[1]?.[4])
-  expect(process.writes.filter(write => write.argv[2]?.includes('cat >') && !write.argv[2]?.includes('cat >>'))).toHaveLength(1)
+  expect(process.writes.filter(write => write.argv[2]?.includes('cat >') && !write.argv[2]?.includes('cat >>'))).toHaveLength(0)
   await ui.unmount()
 })
 
@@ -618,6 +639,22 @@ test('a pane that has a lot of output draws it, whatever the lines say', async (
   await ui.unmount()
 })
 
+test('a line of output keeps its row when there are more lines than rows, so none is drawn over another', async ($, on) => {
+  const lines = Array.from({ length: 100 }, (_, at) => `line ${at}\n`)
+  const process = { calls: [] as string[][], lines }
+  engine(on, process)
+  await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
+  await gt($, 'make build')
+  await untilPrinted($, 'line 99')
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const drawn = (await ui.findAll({ type: 'Box' })).filter(box => box.key?.startsWith('line:'))
+  expect(drawn.length).toBeGreaterThan(0)
+  // A row that may shrink is squeezed to nothing in a box that is too short, and what it says is painted over its neighbour.
+  for (const box of drawn) expect(box.props.flexShrink, box.key).toBe(0)
+  await ui.unmount()
+})
+
 test('"forceColor" in xdock.json asks the commands to colour their output', async ($, on) => {
   const process = { calls: [] as string[][], spawns: [] as { argv: readonly string[]; env?: Record<string, string> | undefined }[], lines: ['ready\n'] }
   engine(on, process, { 'xdock.json': '{"forceColor":true}', 'package.json': '{}' })
@@ -625,6 +662,16 @@ test('"forceColor" in xdock.json asks the commands to colour their output', asyn
   await gt($, 'npm test')
 
   expect(process.spawns[0]?.env).toEqual({ FORCE_COLOR: '1', CLICOLOR_FORCE: '1' })
+})
+
+test('"forceColor" leaves a command alone that sets its own colour, so it can ask for none', async ($, on) => {
+  const process = { calls: [] as string[][], spawns: [] as { argv: readonly string[]; env?: Record<string, string> | undefined }[], lines: ['ready\n'] }
+  engine(on, process, { 'xdock.json': '{"forceColor":true}', 'package.json': '{}' })
+  await $.session.start({ cwd: '/w/sample-app', surface: 'terminal', isInteractive: true })
+  await gt($, 'NO_COLOR=1 make build')
+
+  expect(process.spawns[0]?.env).toBeUndefined()
+  expect(process.spawns[0]?.argv[4]).toBe('NO_COLOR=1 make build')
 })
 
 test('the output a script reads for a phrase reaches the pane as the command wrote it', async ($, on) => {

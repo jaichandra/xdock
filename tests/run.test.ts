@@ -10,6 +10,7 @@ import {
   isAtBottom,
   isInteractive,
   withColor,
+  setsColor,
   makeTargets,
   matchesAny,
   MAX_LINES,
@@ -328,4 +329,15 @@ test('the question names the run and the tool that shows its output', async () =
   expect(text).toContain('fail')
   expect(text).toContain('mcp__xdock__run_output')
   expect(troublePrompt(3, 'npm run dev', 'errors', 'x')).toContain('print errors')
+})
+
+test('a command that sets its own colour is told apart from one that does not', () => {
+  expect(setsColor('NO_COLOR=1 make build')).toBe(true)
+  expect(setsColor('FORCE_COLOR=0 npm test')).toBe(true)
+  expect(setsColor('cd app && CLICOLOR_FORCE=0 make')).toBe(true)
+  expect(setsColor('env FORCE_COLOR=0 npm test')).toBe(true)
+  expect(setsColor('npm test')).toBe(false)
+  // Only an assignment counts: the name as an argument or in a longer name is not one.
+  expect(setsColor('echo NO_COLOR')).toBe(false)
+  expect(setsColor('MY_NO_COLOR=1 npm test')).toBe(false)
 })

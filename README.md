@@ -122,7 +122,7 @@ The buttons:
 | Restart | Runs a finished run's command again. |
 | Clear | Empties the selected run's output. |
 | Remove | Takes a finished run off the list. |
-| Open in shell | Opens the selected run in a terminal. A run in a hidden terminal: the same as Attach. A run in a pane beside Claude Code: says so. A process of the plugin (it runs on pipes, with no terminal to attach to): a terminal window (in the terminal Claude Code runs in, on macOS; on Linux with a screen, the first terminal emulator found, as for Attach; elsewhere you get the line to type) with **all its output so far, then live**: the output is copied as it arrives to a private file (`xdock-*.log` in `$TMPDIR`, removed with the run or when you leave) that the window tails. It is a view: typing there does not reach the process, and Ctrl+C there ends the viewing, not the run. With no run selected, the same as `/shell`. |
+| Open in shell | Opens the selected run in a terminal. A run in a hidden terminal: the same as Attach. A run in a pane beside Claude Code: says so. A process of the plugin (it runs on pipes, with no terminal to attach to): a terminal window (in the terminal Claude Code runs in, on macOS; on Linux with a screen, the first terminal emulator found, as for Attach; elsewhere you get the line to type) with **all its output so far, then live**: every process of the plugin copies what it prints, as it arrives, byte for byte, to a private file (`xdock-*.log` in `$TMPDIR`, removed with the run or when you leave) that the window tails. It is a view: typing there does not reach the process, and Ctrl+C there ends the viewing, not the run. With no run selected, the same as `/shell`. |
 | Close pane | Closes the dock. Esc does the same. Runs keep going. |
 
 Commands run through `sh -lc` (a login shell, so `/etc/profile` and `~/.profile` apply) in the folder the session is in. The dock scrolls as a whole (mouse wheel, or the keys while it has the focus), follows new output while it is scrolled to the bottom, and stays where you left it once you scroll up; scrolling back to the last line follows it again. With the pane focused, Tab and the arrow keys walk its buttons, and Esc closes it.
@@ -164,7 +164,7 @@ Elsewhere `/shell` says so and does nothing. The folder (for the macOS window) i
 
 ### `run_output`
 
-A tool for Claude, not for you: `mcp__xdock__run_output`. It returns the last lines of a run (60 by default, 500 at most) with its status. Give `run` as the run's number or a part of its command; with none, the newest run. Claude sees a run's output only when it calls this tool.
+A tool for Claude, not for you: `mcp__xdock__run_output`. It returns the last lines of a run (60 by default, 500 at most) with its status. Give `run` as the run's number or a part of its command; with none, the newest run. The answer ends with the path of the run's file, which holds all of its output as it was printed (colour codes included, nothing cut), so Claude can search past the dock's last 2,000 lines. Claude sees a run's output only when it calls this tool.
 
 ## What it runs and what it sends
 
@@ -178,7 +178,7 @@ Programs it runs, all through the engine's `process` calls, in the folder of the
 - `ps`, `pgrep`, `kill` and `tail`, to see whether a pane's shell is idle, to find a run's background jobs and process tree, and to stop it.
 - `run_output` is a tool the plugin adds. It only returns the recent output of runs the plugin started; it does not stand in for any built-in tool. The plugin's `tool.call` hook answers `run_output` itself, with the output text, instead of running a program: that is the only tool it answers for, and only when Claude calls it. Every other tool call is left alone. Its hook (`tool.call`) fires only for `run_output` and reads only that call's two inputs, `run` and `lines`. The plugin does not read the conversation, prompts or other tool calls, and nothing from them reaches any program.
 
-Files it reads, and what becomes of them: `hooks/xdock.json`, and `package.json`, `Makefile` and `Cargo.toml` in the session's folder, to suggest commands. They are read only to build the suggestions and settings shown in the dock; their contents are never put into a program's arguments, a command line or any request, and nothing is sent anywhere. The programs above are run with fixed arguments, plus the command you type, the pane or process ids, and the folder's path. The folder's git remote (`git remote get-url origin`) is read only to compare with `openFor` words on your machine. The plugin writes a spool file of a run's output to `$TMPDIR` (or `/tmp`), removed when the run is dropped.
+Files it reads, and what becomes of them: `hooks/xdock.json`, and `package.json`, `Makefile` and `Cargo.toml` in the session's folder, to suggest commands. They are read only to build the suggestions and settings shown in the dock; their contents are never put into a program's arguments, a command line or any request, and nothing is sent anywhere. The programs above are run with fixed arguments, plus the command you type, the pane or process ids, and the folder's path. The folder's git remote (`git remote get-url origin`) is read only to compare with `openFor` words on your machine. The plugin writes a spool file of a process's output to `$TMPDIR` (or `/tmp`) from its first byte, readable only by you (`umask 077`), removed when the run is dropped or you leave. It grows with the output; a run that prints without end grows it without end.
 
 ## Optional: `hooks/xdock.json`
 
@@ -195,7 +195,7 @@ The mod needs no configuration. If you bundle it into your own tooling you can d
 - `suggestions`: commands to suggest before the ones found in the folder.
 - `interactive`: first words of commands that get a terminal, besides the ones the plugin knows (see Commands that need a terminal).
 - `panes`: `"all"` gives every command a terminal, not only the ones that need it, as 0.3 did.
-- `forceColor`: `true` starts every command with `FORCE_COLOR=1` and `CLICOLOR_FORCE=1`, so tools that colour only for a terminal colour in the pane. Off by default: colour changes the text other scripts read.
+- `forceColor`: `true` starts every command with `FORCE_COLOR=1` and `CLICOLOR_FORCE=1`, so tools that colour only for a terminal colour in the pane. Off by default: colour changes the text other scripts read. A command that sets `FORCE_COLOR`, `NO_COLOR` or `CLICOLOR_FORCE` itself (`NO_COLOR=1 make build`) is left as it is.
 - `multiplexer`: `false` keeps `/x` out of herdr and tmux panes and out of the hidden tmux server, so it runs commands as processes of the plugin even inside them. `/shell` keeps using them.
 - `openFor`: words that make the pane open by itself, without taking the keyboard, when the folder's git remote (`origin`) or its path contains one of them (case does not matter; a linked worktree shares its repository's remote, so it counts). Anywhere else the pane waits for `/x`.
 

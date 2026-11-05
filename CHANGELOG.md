@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.5
+
+- **Every process keeps all its output, as it printed it, in a private file.** From its first byte, a run's output is copied to `xdock-*.log` in `$TMPDIR` (readable only by you), colours, `\r` redraws and unfinished lines included, so nothing the dock cuts at its edge, tidies or scrolls off after 2,000 lines is lost. Open in shell follows that file from its first line, and `run_output` ends its answer with the file's path, so Claude can search all of it. Before, the file was made only by Open in shell, from the dock's tidied copy.
+- **A command that sets its own colour is left alone by `forceColor`.** `NO_COLOR=1 make build` (or `FORCE_COLOR=0`, `CLICOLOR_FORCE=0`) runs without `FORCE_COLOR=1` added, so a script that looks for a phrase like `compiled successfully` in a tool's output still finds it. Before, `forceColor` coloured the phrase and such a script never saw it.
+- **Fix: lines of output drawn over one another.** When a run printed more lines than the output box has rows, the newest lines were squeezed to no height and painted over their neighbours, so some vanished (such as a banner after a long build). Each line now keeps its row, and the oldest are cut at the top.
+
 ## 0.5.4
 
 - **An "Ask Claude why" button next to a run that went wrong.** A run that could not start, ended with an exit code other than 0 (or was killed), or is still going but printed an error in its last 40 lines gets the button after its status. Pressing it asks Claude, as your own words, why that run failed, and points it at `run_output`. A run you stopped, or that exited 0, has none.
