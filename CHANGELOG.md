@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.7
+
+- **No more "prompt.compose hook was skipped" line on managed machines.** The plugin no longer adds a section to the system prompt (a `prompt.compose` hook that a machine's policy module could skip, printing a notice on every prompt). The same guidance now lives in `run_output`'s description.
+
 ## 0.5.6
 
 - **`forceColor` ships off.** `hooks/xdock.json` no longer sets `"forceColor": true`, which is what the README always said the default was. With it on, every command ran with `FORCE_COLOR=1`, and a script that looks for a phrase in a tool's output (`compiled successfully` from a build) never found it once the tool coloured it, so such a script could sit forever waiting. Commands now run as they would in a pipe; colour is opt-in with `"forceColor": true` in `hooks/xdock.json`, or per command (`FORCE_COLOR=1 npm test`).

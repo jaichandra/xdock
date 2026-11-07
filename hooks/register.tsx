@@ -905,7 +905,7 @@ export const register: Register = on => {
     await $.tool.register({
       name: 'run_output',
       description:
-        'The latest output of a command the person started in the dock (a dev server, a test run, a build, a sandbox command). Call this FIRST when asked why a dev run, server, test or other command failed, crashed or printed something, or what it shows: before searching logs, Docker or processes. Give `run` as its number or part of its command; with none, the newest run.',
+        'The latest output of a command the person started in the dock (a dev server, a test run, a build, a sandbox command). Call this FIRST when asked why a dev run, server, test or other command failed, crashed or printed something, or what it shows: before searching logs, Docker or processes. Also call it after a run you were told about ends or looks stuck, instead of guessing. Give `run` as its number or part of its command; with none, the newest run.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -924,22 +924,6 @@ export const register: Register = on => {
   on('command.run', { command: 'x' }, async ($, e) => ({ text: await runPrompt($, e.args, e.presentation?.isFullscreen === true) }))
 
   on('command.run', { command: 'shell' }, async $ => ({ text: await openShell($) }))
-
-  // The tool is deferred in most sessions, so its description alone does not bring Claude to it when a
-  // person asks "why did the dev run fail". A standing line in the system prompt does.
-  on('prompt.compose', async ($, e, next) => {
-    const { sections } = await next(e)
-    return {
-      sections: [
-        ...sections,
-        {
-          id: 'xdock:run-output',
-          scope: 'session' as const,
-          text: `Commands the person runs in the xdock dock (a dev server, a test run, a build, a sandbox command) print their output there, and you see it only through the ${TOOL} tool (load it with ToolSearch if it is deferred). When asked why a dev run, server, test or command failed, crashed or hung, or what it printed, call ${TOOL} first, before searching logs, Docker or processes. Also call it after a run you were told about ends or looks stuck, instead of guessing.`,
-        },
-      ],
-    }
-  })
 
   on('tool.call', { tool: TOOL }, async ($, e) => {
     const wanted = typeof e.run === 'string' ? e.run.trim() : ''
